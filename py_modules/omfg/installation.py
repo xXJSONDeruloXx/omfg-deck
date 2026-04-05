@@ -54,8 +54,9 @@ class InstallationService(BaseService):
                 # 3. Extract and place files
                 self._extract_and_install(zip_path)
 
-            # 4. Write default config
+            # 4. Write default config and wrapper script
             self._write_default_config()
+            self._write_wrapper_script()
 
             self.log.info("omfg installed successfully")
             return {"success": True, "message": "omfg installed successfully", "error": None}
@@ -107,6 +108,13 @@ class InstallationService(BaseService):
         try:
             lib_ok = self.lib_file.exists()
             json_ok = self.json_file.exists()
+            version = ""
+            if json_ok:
+                try:
+                    manifest = json.loads(self.json_file.read_text())
+                    version = manifest.get("layer", {}).get("implementation_version", "")
+                except Exception:
+                    pass
             return {
                 "installed": lib_ok and json_ok,
                 "lib_exists": lib_ok,
@@ -209,3 +217,24 @@ class InstallationService(BaseService):
         toml = ConfigurationManager.generate_toml(ConfigurationManager.get_defaults())
         self._atomic_write(self.config_file, toml, 0o644)
         self.log.info(f"Wrote default config → {self.config_file}")
+
+    def _write_wrapper_script(self) -> None:
+        """Write an optional omfg-wrapper.sh the user can use as a Steam launch option."""
+        wrapper_path = self.config_dir / WRAPPER_FILENAME
+        config_path = str(self.config_file)
+        script = f"""#!/usr/bin/env bash
+# OMFG wrapper script — managed by omfg-deck Decky plugin
+# Usage (Steam Launch Options):  {wrapper_path} %command%
+set -euo pipefail
+
+export ENABLE_OMFG_RUST=1
+export OMFG_HOT_CONFIG_PATH="{config_path}"
+
+# Ensure config and log dirs exist
+mkdir -p "$(dirname "{config_path}")" "${{HOME}}/.local/share/omfg/logs"
+
+exec "$@"
+"""
+        self._atomic_write(wrapper_path, script, 0o755)
+        self.log.info(f"Wrote wrapper script → {wrapper_path}")
+

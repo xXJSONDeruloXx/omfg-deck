@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { PanelSection } from "@decky/ui";
-import { useInstallationStatus } from "../hooks/useOmfgHooks";
-import { useOmfgConfig } from "../hooks/useOmfgHooks";
+import { useInstallationStatus, useOmfgConfig } from "../hooks/useOmfgHooks";
 import { useInstallationActions } from "../hooks/useInstallationActions";
 import { StatusDisplay } from "./StatusDisplay";
 import { InstallationButton } from "./InstallationButton";
