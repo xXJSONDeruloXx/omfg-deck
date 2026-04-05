@@ -1,11 +1,11 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
+  "name": "OMFG",
+  "author": "Kurt Himebauch",
   "flags": ["debug", "_root"],
   "api_version": 1,
   "publish": {
-    "tags": ["template", "root"],
-    "description": "Decky example plugin.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "tags": ["installer", "vulkan", "framegen", "omfg"],
+    "description": "Enable OMFG (Open Multi Frame Generation) Vulkan layer on the Steam Deck.",
+    "image": "https://opengraph.githubassets.com/1/xXJSONDeruloXx/omfg"
   }
 }
