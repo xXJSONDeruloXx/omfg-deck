@@ -1,0 +1,19 @@
+[project]
+name = "omfg-deck"
+version = "0.1.1"
+description = "Decky Loader plugin for the OMFG Vulkan frame-generation layer"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["py_modules"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["omfg"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 95
