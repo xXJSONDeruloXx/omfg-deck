@@ -1,6 +1,5 @@
 /**
  * Centralized configuration schema for omfg-deck.
- *
  * Keys match the OMFG_* environment variable names used in omfg-live.toml [env].
  */
 
@@ -32,7 +31,7 @@ export const DEBUG_VIEWS = [
 export type DebugView = (typeof DEBUG_VIEWS)[number];
 
 // ---------------------------------------------------------------------------
-// Typed config object — keys are the raw env var names
+// Typed config object
 // ---------------------------------------------------------------------------
 
 export interface OmfgConfig {
@@ -60,16 +59,30 @@ export interface OmfgConfig {
   OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES: number;
   OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES: number;
   OMFG_ADAPTIVE_MULTI_TARGET_FPS: number;
-  // BFI
+  OMFG_ADAPTIVE_MULTI_INTERVAL_THRESHOLD_MS: number;
+  // BFI / visual timing
   OMFG_BFI_PERIOD: number;
+  OMFG_BFI_HOLD_MS: number;
+  OMFG_VISUAL_HOLD_MS: number;
+  // Mode-specific flags
+  OMFG_BLEND_ORIGINAL_PRESENT_FIRST: number;
+  OMFG_COPY_ORIGINAL_PRESENT_FIRST: number;
+  OMFG_HISTORY_COPY_FREEZE_HISTORY: number;
   // Diagnostics
   OMFG_PRESENT_TIMING: number;
   OMFG_PRESENT_WAIT: number;
+  OMFG_PRESENT_WAIT_TIMEOUT_NS: number;
   OMFG_BENCHMARK: number;
+  OMFG_BENCHMARK_LABEL: string;
+  // Startup-scoped (need game restart)
+  OMFG_SWAPCHAIN_IMAGE_BUMP_OVERRIDE: number;
+  OMFG_CREATE_DEVICE_DEBUG: number;
+  OMFG_CREATE_DEVICE_APPEND_TIMING_EXTENSIONS: number;
+  OMFG_CREATE_DEVICE_APPEND_TIMING_FEATURES: number;
 }
 
 // ---------------------------------------------------------------------------
-// Defaults (must match Python DEFAULTS dict)
+// Defaults
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_CONFIG: OmfgConfig = {
@@ -94,32 +107,57 @@ export const DEFAULT_CONFIG: OmfgConfig = {
   OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES: 0,
   OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES: 2,
   OMFG_ADAPTIVE_MULTI_TARGET_FPS: 120,
+  OMFG_ADAPTIVE_MULTI_INTERVAL_THRESHOLD_MS: 1.0,
   OMFG_BFI_PERIOD: 1,
+  OMFG_BFI_HOLD_MS: 8,
+  OMFG_VISUAL_HOLD_MS: 8,
+  OMFG_BLEND_ORIGINAL_PRESENT_FIRST: 0,
+  OMFG_COPY_ORIGINAL_PRESENT_FIRST: 0,
+  OMFG_HISTORY_COPY_FREEZE_HISTORY: 0,
   OMFG_PRESENT_TIMING: 0,
   OMFG_PRESENT_WAIT: 0,
+  OMFG_PRESENT_WAIT_TIMEOUT_NS: 5_000_000_000,
   OMFG_BENCHMARK: 0,
+  OMFG_BENCHMARK_LABEL: "live",
+  OMFG_SWAPCHAIN_IMAGE_BUMP_OVERRIDE: 0,
+  OMFG_CREATE_DEVICE_DEBUG: 0,
+  OMFG_CREATE_DEVICE_APPEND_TIMING_EXTENSIONS: 0,
+  OMFG_CREATE_DEVICE_APPEND_TIMING_FEATURES: 0,
 };
 
 export function getDefaults(): OmfgConfig {
   return { ...DEFAULT_CONFIG };
 }
 
-/** True if the mode uses multi-frame generation. */
+// ---------------------------------------------------------------------------
+// Mode classification helpers
+// ---------------------------------------------------------------------------
+
 export function isMultiMode(mode: string): boolean {
   return (LAYER_MODES_MULTI as readonly string[]).includes(mode);
 }
-
-/** True if the mode uses optical flow. */
 export function isOptflowMode(mode: string): boolean {
   return mode.startsWith("optflow");
 }
-
-/** True if the mode uses reprojection. */
 export function isReprojectMode(mode: string): boolean {
   return mode.startsWith("reproject") || mode.startsWith("search");
 }
-
-/** True if the mode uses adaptive frame count control. */
 export function isAdaptiveMode(mode: string): boolean {
   return mode.includes("adaptive");
+}
+export function isBfiMode(mode: string): boolean {
+  return mode === "bfi";
+}
+export function isBlendMode(mode: string): boolean {
+  return mode.includes("blend");
+}
+export function isCopyMode(mode: string): boolean {
+  return mode === "copy";
+}
+export function isHistoryCopyMode(mode: string): boolean {
+  return mode === "history-copy";
+}
+export function isVisualMode(mode: string): boolean {
+  // modes that use OMFG_VISUAL_HOLD_MS
+  return mode === "bfi" || mode === "copy" || mode === "history-copy";
 }

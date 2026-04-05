@@ -40,6 +40,10 @@ LAYER_MODES_MULTI = [
 ]
 ALL_LAYER_MODES = LAYER_MODES_UTILITY + LAYER_MODES_SINGLE + LAYER_MODES_MULTI
 
+# File names (misc)
+ENV_FILENAME = "omfg.env"
+LOG_FILENAME = "omfg.log"
+
 # Available debug views
 DEBUG_VIEWS = [
     "off", "motion", "confidence", "ambiguity", "disocclusion", "hole-fill", "fallback"

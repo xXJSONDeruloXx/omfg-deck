@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { PanelSection } from "@decky/ui";
-import { useInstallationStatus, useOmfgConfig } from "../hooks/useOmfgHooks";
+import { PanelSection, PanelSectionRow, ToggleField } from "@decky/ui";
+import { useInstallationStatus, useOmfgConfig, useLayerEnabled } from "../hooks/useOmfgHooks";
 import { useInstallationActions } from "../hooks/useInstallationActions";
 import { StatusDisplay } from "./StatusDisplay";
 import { InstallationButton } from "./InstallationButton";
@@ -8,6 +8,7 @@ import { ConfigurationSection } from "./ConfigurationSection";
 import { UsageInstructions } from "./UsageInstructions";
 import { PluginUpdateChecker } from "./PluginUpdateChecker";
 import { GitHubButton } from "./GitHubButton";
+import { LogViewer } from "./LogViewer";
 import { OmfgConfig } from "../config/configSchema";
 
 export function Content() {
@@ -22,13 +23,11 @@ export function Content() {
   } = useInstallationStatus();
 
   const { config, loadConfig, updateField, resetConfig } = useOmfgConfig();
+  const { layerEnabled, toggleEnabled } = useLayerEnabled();
   const { isInstalling, isUninstalling, handleInstall, handleUninstall } = useInstallationActions();
 
-  // Re-check full status after install/uninstall
   useEffect(() => {
-    if (isInstalled) {
-      loadConfig();
-    }
+    if (isInstalled) loadConfig();
   }, [isInstalled, loadConfig]);
 
   const onInstall = () =>
@@ -37,18 +36,28 @@ export function Content() {
       await checkInstallation();
     });
 
-  const onUninstall = () =>
-    handleUninstall(setIsInstalled, setInstallationStatus);
+  const onUninstall = () => handleUninstall(setIsInstalled, setInstallationStatus);
 
-  const handleFieldChange = async (
-    key: keyof OmfgConfig,
-    value: OmfgConfig[keyof OmfgConfig]
-  ) => {
+  const handleFieldChange = async (key: keyof OmfgConfig, value: OmfgConfig[keyof OmfgConfig]) => {
     await updateField(key, value);
   };
 
   return (
     <PanelSection>
+      {/* Global enable/disable — most prominent control */}
+      <PanelSectionRow>
+        <ToggleField
+          label="OMFG Enabled"
+          description={
+            layerEnabled
+              ? "Layer will activate on games using the wrapper launch option"
+              : "Layer is globally disabled — games will run without OMFG"
+          }
+          checked={layerEnabled}
+          onChange={toggleEnabled}
+        />
+      </PanelSectionRow>
+
       <InstallationButton
         isInstalled={isInstalled}
         isInstalling={isInstalling}
@@ -73,6 +82,8 @@ export function Content() {
       )}
 
       <UsageInstructions config={config} />
+
+      {isInstalled && <LogViewer />}
 
       <GitHubButton />
 

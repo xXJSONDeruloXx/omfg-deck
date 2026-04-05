@@ -68,9 +68,9 @@ class TestValidate:
         result = ConfigurationManager.validate({"UNKNOWN_KEY": 99})
         assert "UNKNOWN_KEY" not in result
 
-    def test_validates_all_25_fields(self):
+    def test_validates_all_37_fields(self):
         result = ConfigurationManager.validate(ConfigurationManager.get_defaults())
-        assert len(result) == 25
+        assert len(result) == 37
 
 
 # ---------------------------------------------------------------------------

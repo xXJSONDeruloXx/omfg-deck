@@ -39,12 +39,26 @@ class OmfgConfig(TypedDict):
     OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES: int
     OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES: int
     OMFG_ADAPTIVE_MULTI_TARGET_FPS: int
-    # BFI
+    OMFG_ADAPTIVE_MULTI_INTERVAL_THRESHOLD_MS: float
+    # BFI / visual timing
     OMFG_BFI_PERIOD: int
-    # Diagnostics (stored as int 0/1)
+    OMFG_BFI_HOLD_MS: int
+    OMFG_VISUAL_HOLD_MS: int
+    # Mode-specific flags
+    OMFG_BLEND_ORIGINAL_PRESENT_FIRST: int
+    OMFG_COPY_ORIGINAL_PRESENT_FIRST: int
+    OMFG_HISTORY_COPY_FREEZE_HISTORY: int
+    # Diagnostics
     OMFG_PRESENT_TIMING: int
     OMFG_PRESENT_WAIT: int
+    OMFG_PRESENT_WAIT_TIMEOUT_NS: int
     OMFG_BENCHMARK: int
+    OMFG_BENCHMARK_LABEL: str
+    # Startup-scoped (need game restart to apply)
+    OMFG_SWAPCHAIN_IMAGE_BUMP_OVERRIDE: int
+    OMFG_CREATE_DEVICE_DEBUG: int
+    OMFG_CREATE_DEVICE_APPEND_TIMING_EXTENSIONS: int
+    OMFG_CREATE_DEVICE_APPEND_TIMING_FEATURES: int
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +68,7 @@ class OmfgConfig(TypedDict):
 DEFAULTS: OmfgConfig = cast(OmfgConfig, {
     "OMFG_LAYER_MODE": "reproject-blend",
     "OMFG_DEBUG_VIEW": "off",
+    # Reproject
     "OMFG_REPROJECT_SEARCH_RADIUS": 2,
     "OMFG_REPROJECT_PATCH_RADIUS": 1,
     "OMFG_REPROJECT_CONFIDENCE_SCALE": 4.0,
@@ -64,19 +79,37 @@ DEFAULTS: OmfgConfig = cast(OmfgConfig, {
     "OMFG_REPROJECT_GRADIENT_CONFIDENCE_WEIGHT": 8.0,
     "OMFG_REPROJECT_CHROMA_WEIGHT": 0.3,
     "OMFG_REPROJECT_AMBIGUITY_SCALE": 6.0,
+    # Optical flow
     "OMFG_OPTICAL_FLOW_SEARCH_RADIUS": 2,
     "OMFG_OPTICAL_FLOW_PATCH_RADIUS": 1,
     "OMFG_OPTICAL_FLOW_LEVELS": 3,
     "OMFG_OPTICAL_FLOW_CONFIDENCE_SCALE": 4.0,
     "OMFG_OPTICAL_FLOW_MOTION_PENALTY": 0.01,
+    # Multi / adaptive
     "OMFG_MULTI_BLEND_COUNT": 2,
     "OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES": 0,
     "OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES": 2,
     "OMFG_ADAPTIVE_MULTI_TARGET_FPS": 120,
+    "OMFG_ADAPTIVE_MULTI_INTERVAL_THRESHOLD_MS": 1.0,
+    # BFI / visual timing
     "OMFG_BFI_PERIOD": 1,
+    "OMFG_BFI_HOLD_MS": 8,
+    "OMFG_VISUAL_HOLD_MS": 8,
+    # Mode-specific flags
+    "OMFG_BLEND_ORIGINAL_PRESENT_FIRST": 0,
+    "OMFG_COPY_ORIGINAL_PRESENT_FIRST": 0,
+    "OMFG_HISTORY_COPY_FREEZE_HISTORY": 0,
+    # Diagnostics
     "OMFG_PRESENT_TIMING": 0,
     "OMFG_PRESENT_WAIT": 0,
+    "OMFG_PRESENT_WAIT_TIMEOUT_NS": 5_000_000_000,
     "OMFG_BENCHMARK": 0,
+    "OMFG_BENCHMARK_LABEL": "live",
+    # Startup-scoped
+    "OMFG_SWAPCHAIN_IMAGE_BUMP_OVERRIDE": 0,
+    "OMFG_CREATE_DEVICE_DEBUG": 0,
+    "OMFG_CREATE_DEVICE_APPEND_TIMING_EXTENSIONS": 0,
+    "OMFG_CREATE_DEVICE_APPEND_TIMING_FEATURES": 0,
 })
 
 # Type map: key → Python type constructor
@@ -102,10 +135,22 @@ _TYPE_MAP: Dict[str, type] = {
     "OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES": int,
     "OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES": int,
     "OMFG_ADAPTIVE_MULTI_TARGET_FPS": int,
+    "OMFG_ADAPTIVE_MULTI_INTERVAL_THRESHOLD_MS": float,
     "OMFG_BFI_PERIOD": int,
+    "OMFG_BFI_HOLD_MS": int,
+    "OMFG_VISUAL_HOLD_MS": int,
+    "OMFG_BLEND_ORIGINAL_PRESENT_FIRST": int,
+    "OMFG_COPY_ORIGINAL_PRESENT_FIRST": int,
+    "OMFG_HISTORY_COPY_FREEZE_HISTORY": int,
     "OMFG_PRESENT_TIMING": int,
     "OMFG_PRESENT_WAIT": int,
+    "OMFG_PRESENT_WAIT_TIMEOUT_NS": int,
     "OMFG_BENCHMARK": int,
+    "OMFG_BENCHMARK_LABEL": str,
+    "OMFG_SWAPCHAIN_IMAGE_BUMP_OVERRIDE": int,
+    "OMFG_CREATE_DEVICE_DEBUG": int,
+    "OMFG_CREATE_DEVICE_APPEND_TIMING_EXTENSIONS": int,
+    "OMFG_CREATE_DEVICE_APPEND_TIMING_FEATURES": int,
 }
 
 
@@ -127,7 +172,7 @@ class ConfigurationManager:
                 try:
                     result[key] = typ(config[key])  # type: ignore[literal-required]
                 except (ValueError, TypeError):
-                    pass  # keep default
+                    pass
         return result
 
     @staticmethod
@@ -168,9 +213,10 @@ class ConfigurationManager:
             key, _, val = line.partition('=')
             key = key.strip()
             val = val.strip()
+            if not key:
+                continue
             if key not in _TYPE_MAP:
                 continue
-            # strip surrounding quotes
             if (val.startswith('"') and val.endswith('"')) or \
                (val.startswith("'") and val.endswith("'")):
                 val = val[1:-1]

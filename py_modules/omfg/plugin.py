@@ -15,6 +15,7 @@ from .config_schema import ConfigurationManager
 from .constants import (
     ALL_LAYER_MODES, DEBUG_VIEWS,
     LAYER_ENABLE_ENV, HOT_CONFIG_ENV,
+    ENV_FILENAME, LOG_FILENAME,
 )
 
 
@@ -73,6 +74,56 @@ class Plugin:
             "%command%"
         )
         return {"success": True, "launch_option": launch_opt}
+
+    # ------------------------------------------------------------------
+    # Layer enable / log
+    # ------------------------------------------------------------------
+
+    async def get_layer_enabled(self) -> Dict[str, Any]:
+        """Read the global layer-enabled flag from omfg.env."""
+        try:
+            env_file = self.configuration_service.config_dir / ENV_FILENAME
+            if not env_file.exists():
+                return {"success": True, "enabled": True}
+            for line in env_file.read_text().splitlines():
+                line = line.strip()
+                if line.startswith("OMFG_DISABLE_LAYER="):
+                    val = line.split("=", 1)[1].strip()
+                    return {"success": True, "enabled": val != "1"}
+            return {"success": True, "enabled": True}
+        except Exception as e:
+            return {"success": False, "enabled": True, "error": str(e)}
+
+    async def set_layer_enabled(self, enabled: bool) -> Dict[str, Any]:
+        """Write OMFG_DISABLE_LAYER to omfg.env to globally enable/disable."""
+        try:
+            env_file = self.configuration_service.config_dir
+            config_dir = self.configuration_service.config_dir
+            config_dir.mkdir(parents=True, exist_ok=True)
+            env_path = config_dir / ENV_FILENAME
+            disable_val = "0" if enabled else "1"
+            content = (
+                "# omfg-deck: global layer enable flag\n"
+                f"OMFG_DISABLE_LAYER={disable_val}\n"
+            )
+            self.configuration_service._atomic_write(env_path, content, 0o644)
+            import decky
+            decky.logger.info(f"Layer globally {'enabled' if enabled else 'disabled'}")
+            return {"success": True, "enabled": enabled}
+        except Exception as e:
+            return {"success": False, "enabled": True, "error": str(e)}
+
+    async def get_layer_log(self, lines: int = 50) -> Dict[str, Any]:
+        """Return the last N lines of the OMFG layer log file."""
+        try:
+            log_path = self.installation_service.log_dir / LOG_FILENAME
+            if not log_path.exists():
+                return {"success": True, "log": "", "message": "Log file not found"}
+            text = log_path.read_text(errors="replace")
+            tail = "\n".join(text.splitlines()[-lines:])
+            return {"success": True, "log": tail, "message": None}
+        except Exception as e:
+            return {"success": False, "log": "", "error": str(e)}
 
     # ------------------------------------------------------------------
     # Self-updater

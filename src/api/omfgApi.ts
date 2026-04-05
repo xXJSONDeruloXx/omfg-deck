@@ -1,8 +1,6 @@
 import { callable } from "@decky/api";
 import { OmfgConfig } from "../config/configSchema";
 
-// --- shared response shapes ---
-
 export interface InstallationResult {
   success: boolean;
   message?: string;
@@ -39,6 +37,19 @@ export interface LaunchOptionResult {
   launch_option: string;
 }
 
+export interface LayerEnabledResult {
+  success: boolean;
+  enabled: boolean;
+  error?: string;
+}
+
+export interface LayerLogResult {
+  success: boolean;
+  log: string;
+  message?: string;
+  error?: string;
+}
+
 export interface UpdateCheckResult {
   success: boolean;
   update_available: boolean;
@@ -58,22 +69,25 @@ export interface UpdateDownloadResult {
 
 // --- callable bindings ---
 
-export const installOmfg = callable<[], InstallationResult>("install_omfg");
-export const uninstallOmfg = callable<[], InstallationResult>("uninstall_omfg");
+export const installOmfg       = callable<[], InstallationResult>("install_omfg");
+export const uninstallOmfg     = callable<[], InstallationResult>("uninstall_omfg");
 export const checkOmfgInstalled = callable<[], InstallationStatus>("check_omfg_installed");
 
-export const getOmfgConfig = callable<[], ConfigResult>("get_omfg_config");
-/** config is passed as a JSON string to avoid positional-arg explosion */
+export const getOmfgConfig    = callable<[], ConfigResult>("get_omfg_config");
 export const updateOmfgConfig = callable<[config_json: string], ConfigResult>("update_omfg_config");
-export const resetOmfgConfig = callable<[], ConfigResult>("reset_omfg_config");
+export const resetOmfgConfig  = callable<[], ConfigResult>("reset_omfg_config");
 
-export const getConfigSchema = callable<[], SchemaResult>("get_config_schema");
-export const getLaunchOption = callable<[], LaunchOptionResult>("get_launch_option");
+export const getConfigSchema  = callable<[], SchemaResult>("get_config_schema");
+export const getLaunchOption  = callable<[], LaunchOptionResult>("get_launch_option");
 
-export const checkForPluginUpdate = callable<[], UpdateCheckResult>("check_for_plugin_update");
-export const downloadPluginUpdate = callable<[download_url: string], UpdateDownloadResult>("download_plugin_update");
+export const getLayerEnabled  = callable<[], LayerEnabledResult>("get_layer_enabled");
+export const setLayerEnabled  = callable<[enabled: boolean], LayerEnabledResult>("set_layer_enabled");
+export const getLayerLog      = callable<[lines: number], LayerLogResult>("get_layer_log");
 
-// --- helper: send a full OmfgConfig object ---
+export const checkForPluginUpdate  = callable<[], UpdateCheckResult>("check_for_plugin_update");
+export const downloadPluginUpdate  = callable<[download_url: string], UpdateDownloadResult>("download_plugin_update");
+
+// --- helper ---
 export async function saveConfig(config: OmfgConfig): Promise<ConfigResult> {
   return updateOmfgConfig(JSON.stringify(config));
 }

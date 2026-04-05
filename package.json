@@ -1,6 +1,6 @@
 {
   "name": "omfg-deck",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Decky Loader plugin for OMFG (Open Multi Frame Generation) Vulkan layer on Steam Deck",
   "type": "module",
   "scripts": {

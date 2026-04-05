@@ -5,6 +5,8 @@ import {
   getOmfgConfig,
   saveConfig,
   resetOmfgConfig,
+  getLayerEnabled,
+  setLayerEnabled,
 } from "../api/omfgApi";
 import { OmfgConfig, getDefaults } from "../config/configSchema";
 
@@ -118,4 +120,42 @@ export function useOmfgConfig() {
   }, []); // intentionally empty — run once on mount
 
   return { config, loadConfig, updateConfig, updateField, resetConfig };
+}
+
+// ---------------------------------------------------------------------------
+// Global layer enable/disable hook
+// ---------------------------------------------------------------------------
+
+export function useLayerEnabled() {
+  const [layerEnabled, setLayerEnabledState] = useState(true);
+
+  const fetchEnabled = useCallback(async () => {
+    try {
+      const result = await getLayerEnabled();
+      if (result.success) setLayerEnabledState(result.enabled);
+    } catch { /* keep default true */ }
+  }, []);
+
+  const toggleEnabled = useCallback(async (enabled: boolean) => {
+    try {
+      const result = await setLayerEnabled(enabled);
+      if (result.success) {
+        setLayerEnabledState(enabled);
+        toaster.toast({
+          title: enabled ? "Layer Enabled" : "Layer Disabled",
+          body: enabled
+            ? "OMFG will activate on next game launch"
+            : "OMFG is globally disabled — wrapper script will skip layer",
+        });
+      } else {
+        toaster.toast({ title: "Failed", body: result.error ?? "Unknown error" });
+      }
+    } catch (e) {
+      toaster.toast({ title: "Failed", body: String(e) });
+    }
+  }, []);
+
+  useEffect(() => { fetchEnabled(); }, [fetchEnabled]);
+
+  return { layerEnabled, toggleEnabled };
 }

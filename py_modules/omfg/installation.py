@@ -228,16 +228,29 @@ class InstallationService(BaseService):
         """Write an optional omfg-wrapper.sh the user can use as a Steam launch option."""
         wrapper_path = self.config_dir / WRAPPER_FILENAME
         config_path = str(self.config_file)
+        env_file = str(self.config_dir / "omfg.env")
         script = f"""#!/usr/bin/env bash
 # OMFG wrapper script — managed by omfg-deck Decky plugin
 # Usage (Steam Launch Options):  {wrapper_path} %command%
 set -euo pipefail
 
+# Source global enable/disable override if present
+if [[ -f "{env_file}" ]]; then
+  # shellcheck disable=SC1090
+  set -a; source "{env_file}"; set +a
+fi
+
+# Respect global disable flag written by the Decky plugin
+if [[ "${{OMFG_DISABLE_LAYER:-0}}" == "1" ]]; then
+  exec "$@"
+fi
+
 export ENABLE_OMFG_RUST=1
 export OMFG_HOT_CONFIG_PATH="{config_path}"
 
-# Ensure config and log dirs exist
-mkdir -p "$(dirname "{config_path}")" "${{HOME}}/.local/share/omfg/logs"
+# Ensure log directory exists
+mkdir -p "${{HOME}}/.local/share/omfg/logs"
+export OMFG_LAYER_LOG_FILE="${{HOME}}/.local/share/omfg/logs/omfg.log"
 
 exec "$@"
 """

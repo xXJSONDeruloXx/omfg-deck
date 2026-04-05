@@ -302,3 +302,113 @@ class TestDownloadPluginUpdate:
             result = run(plugin.download_plugin_update("http://example.com/x.zip"))
         assert result["success"] is False
         assert result["error"] is not None
+
+
+# ---------------------------------------------------------------------------
+# get_layer_enabled / set_layer_enabled
+# ---------------------------------------------------------------------------
+
+class TestLayerEnabledMethods:
+    def test_enabled_by_default_when_no_env_file(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_layer_enabled())
+        assert result["success"] is True
+        assert result["enabled"] is True
+
+    def test_set_disabled_then_read_back(self, patched_home, mock_decky):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_layer_enabled(False))
+        result = run(plugin.get_layer_enabled())
+        assert result["success"] is True
+        assert result["enabled"] is False
+
+    def test_set_enabled_then_read_back(self, patched_home, mock_decky):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_layer_enabled(False))
+        run(plugin.set_layer_enabled(True))
+        result = run(plugin.get_layer_enabled())
+        assert result["enabled"] is True
+
+    def test_env_file_created(self, patched_home, mock_decky):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_layer_enabled(False))
+        env_path = plugin.configuration_service.config_dir / "omfg.env"
+        assert env_path.exists()
+        assert "OMFG_DISABLE_LAYER=1" in env_path.read_text()
+
+
+# ---------------------------------------------------------------------------
+# get_layer_log
+# ---------------------------------------------------------------------------
+
+class TestGetLayerLog:
+    def test_returns_empty_when_no_log(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_layer_log(50))
+        assert result["success"] is True
+        assert result["log"] == ""
+
+    def test_returns_last_n_lines(self, patched_home):
+        plugin = make_plugin(patched_home)
+        log_dir = plugin.installation_service.log_dir
+        log_dir.mkdir(parents=True, exist_ok=True)
+        lines = [f"line {i}" for i in range(100)]
+        (log_dir / "omfg.log").write_text("\n".join(lines))
+
+        result = run(plugin.get_layer_log(10))
+        assert result["success"] is True
+        returned = result["log"].splitlines()
+        assert len(returned) == 10
+        assert returned[-1] == "line 99"
+
+
+# ---------------------------------------------------------------------------
+# Edge-case branches for layer-enabled and log methods
+# ---------------------------------------------------------------------------
+
+class TestLayerEnabledEdgeCases:
+    def test_env_file_with_no_disable_key_returns_enabled(self, patched_home, mock_decky):
+        """File exists but has no OMFG_DISABLE_LAYER line → enabled=True fallback."""
+        plugin = make_plugin(patched_home)
+        plugin.configuration_service.config_dir.mkdir(parents=True, exist_ok=True)
+        env = plugin.configuration_service.config_dir / "omfg.env"
+        env.write_text("# comment only\nSOME_OTHER_VAR=1\n")
+        result = run(plugin.get_layer_enabled())
+        assert result["success"] is True
+        assert result["enabled"] is True
+
+    def test_get_layer_enabled_exception_returns_error(self, patched_home, monkeypatch):
+        plugin = make_plugin(patched_home)
+        monkeypatch.setattr(
+            plugin.configuration_service.config_dir.__class__, "exists",
+            lambda s: (_ for _ in ()).throw(RuntimeError("stat error"))
+        )
+        # Make the config_dir.exists() raise
+        from unittest.mock import patch as _patch
+        with _patch.object(Path, "exists", side_effect=RuntimeError("stat error")):
+            result = run(plugin.get_layer_enabled())
+        assert result["success"] is False
+        assert result["enabled"] is True   # safe default
+
+    def test_set_layer_enabled_exception_returns_error(self, patched_home, mock_decky):
+        plugin = make_plugin(patched_home)
+        from unittest.mock import patch as _patch
+        with _patch.object(
+            plugin.configuration_service, "_atomic_write",
+            side_effect=OSError("disk full")
+        ):
+            result = run(plugin.set_layer_enabled(False))
+        assert result["success"] is False
+        assert result["error"] is not None
+
+    def test_get_layer_log_exception_returns_error(self, patched_home):
+        plugin = make_plugin(patched_home)
+        log_dir = plugin.installation_service.log_dir
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "omfg.log"
+        log_file.write_text("some log")
+        from unittest.mock import patch as _patch
+        with _patch.object(Path, "read_text", side_effect=OSError("perm denied")):
+            result = run(plugin.get_layer_log(10))
+        assert result["success"] is False
+        assert result["error"] is not None
