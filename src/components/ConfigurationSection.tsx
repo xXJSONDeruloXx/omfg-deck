@@ -1,3 +1,4 @@
+import React from "react";
 import { PanelSectionRow, ToggleField, SliderField } from "@decky/ui";
 import { OmfgConfig, ALL_LAYER_MODES, DEBUG_VIEWS, isMultiMode, isAdaptiveMode, isReprojectMode, isOptflowMode } from "../config/configSchema";
 
