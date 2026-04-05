@@ -1,25 +1,33 @@
 # omfg-deck TDD — Near-Full Coverage
 
-## Goal
-Write a pytest suite covering all Python backend modules. Target: red→green, near-full coverage across all public methods and edge cases.
+## Status: COMPLETE ✅  176/176 passing · 100% coverage
 
-## Modules to cover
-- `config_schema.py` — `ConfigurationManager`: get_defaults, validate, generate_toml, parse_toml, roundtrip
-- `configuration.py` — `ConfigurationService`: get_config, update_config, update_field, reset_config (with backup), file-not-found path, parse error path
-- `installation.py` — `InstallationService`: check_installation (all combos), uninstall (files present/absent), _extract_and_install (zip layout), _write_default_config, _write_wrapper_script, cleanup_on_uninstall, _get_release_asset_url fallback, _version_newer
-- `base_service.py` — `BaseService`: path construction, _ensure_directories, _remove_if_exists, _atomic_write
-- `plugin.py` — `Plugin`: all async methods mocked at service layer, _version_newer edge cases, get_launch_option path construction
+## Coverage report
+```
+Name                               Stmts   Miss  Cover
+------------------------------------------------------
+py_modules/omfg/__init__.py            2      0   100%
+py_modules/omfg/base_service.py       51      0   100%
+py_modules/omfg/config_schema.py      80      0   100%
+py_modules/omfg/configuration.py      47      0   100%
+py_modules/omfg/constants.py          21      0   100%
+py_modules/omfg/installation.py      131      0   100%
+py_modules/omfg/plugin.py            102      0   100%
+py_modules/omfg/types.py              38      0   100%
+------------------------------------------------------
+TOTAL                                472      0   100%
+```
 
-## Constraints
-- No real network calls (mock `urllib.request.urlopen`)
-- No real filesystem (use `pyfakefs` or `tmp_path` fixtures)
-- Mock `decky` module (not available outside deck)
-- pytest + pytest-mock + pyfakefs already installed
-- Tests live in `tests/`
-- `conftest.py` sets up mock_logger, mock_decky, patches Path.home()
+## Test files
+- tests/conftest.py — fixtures: mock_decky, mock_logger, tmp_home, patched_home
+- tests/test_config_schema.py — 56 tests
+- tests/test_configuration.py — 23 tests
+- tests/test_base_service.py — 9 tests
+- tests/test_installation.py — 40 tests
+- tests/test_plugin.py — 34 tests
+- tests/test_coverage_gaps.py — 23 tests (exception branches, lifecycle, _download)
 
-## Working directory
-`/Users/kurt/Developer/omfg-deck`
-
-## Reference pattern
-`/Users/kurt/Developer/decky-lossless-scaling-vk/tests/` — same stack, same fixture patterns
+## Key bugs caught by tests during TDD
+1. WRAPPER_FILENAME missing import → NameError on plugin load
+2. update_field method orphaned (def line dropped)
+3. shutil.copyfileobj infinite loop with MagicMock (fixed with BytesIO)
