@@ -4,3 +4,4 @@ export { InstallationButton } from "./InstallationButton";
 export { ConfigurationSection } from "./ConfigurationSection";
 export { UsageInstructions } from "./UsageInstructions";
 export { PluginUpdateChecker } from "./PluginUpdateChecker";
+export { GitHubButton } from "./GitHubButton";

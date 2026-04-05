@@ -8,6 +8,7 @@ import { InstallationButton } from "./InstallationButton";
 import { ConfigurationSection } from "./ConfigurationSection";
 import { UsageInstructions } from "./UsageInstructions";
 import { PluginUpdateChecker } from "./PluginUpdateChecker";
+import { GitHubButton } from "./GitHubButton";
 import { OmfgConfig } from "../config/configSchema";
 
 export function Content() {
@@ -64,6 +65,8 @@ export function Content() {
       )}
 
       <UsageInstructions config={config} />
+
+      <GitHubButton />
 
       <PluginUpdateChecker />
     </PanelSection>
