@@ -1,23 +1,20 @@
 # omfg-deck Gap Fix Loop
 
-## Confirmed gaps to fix
+## Status: COMPLETE ✅
 
-### TypeScript / Frontend
-1. **ConfigurationSection: `CycleField` → `DropdownItem`** (proper Decky gamepad-navigable dropdown for mode + debug view)
-2. **ConfigurationSection: missing all advanced reproject sliders** (5 missing: DISOCCLUSION_SCALE, HOLE_FILL_RADIUS, GRADIENT_CONFIDENCE_WEIGHT, CHROMA_WEIGHT, AMBIGUITY_SCALE)
-3. **ConfigurationSection: missing optical flow sliders** (3 missing: PATCH_RADIUS, CONFIDENCE_SCALE, MOTION_PENALTY)
-4. **ConfigurationSection: missing `OMFG_PRESENT_WAIT` toggle** in diagnostics
-5. **ConfigurationSection: add "Reset to Defaults" button** wired to backend
-6. **`omfgApi.ts`: add `resetOmfgConfig` callable**
-7. **`useOmfgConfig`: add `resetConfig` function**
-8. **`InstallationStatus` interface: add `config_exists`, `wrapper_exists`, `installed_version` fields**
-9. **`StatusDisplay`: show config file presence status**
-10. **`defaults.txt`: replace placeholder with OMFG-specific content**
+All 13 gaps fixed in previous turn. Clean build. 5 total commits on main.
 
-### Python / Backend
-11. **`check_installation` returns dead `version` variable** — remove dead code, include `config_exists`, `wrapper_exists`, `installed_version` in response
-12. **`InstallationCheckResponse` TypedDict**: add `config_exists`, `wrapper_exists`, `installed_version`
-13. **Add `reset_config` method** to `plugin.py` and `configuration.py`
-
-## Working directory
-`/Users/kurt/Developer/omfg-deck`
+## Checklist
+- [x] CycleField → DropdownItem (proper Decky gamepad dropdown)
+- [x] All 5 missing reproject sliders (DISOCCLUSION_SCALE, HOLE_FILL_RADIUS, GRADIENT_CONFIDENCE_WEIGHT, CHROMA_WEIGHT, AMBIGUITY_SCALE)
+- [x] All 3 missing optflow sliders (PATCH_RADIUS, CONFIDENCE_SCALE, MOTION_PENALTY)
+- [x] OMFG_PRESENT_WAIT toggle in Diagnostics
+- [x] Reset to Defaults button wired to backend
+- [x] resetOmfgConfig callable in omfgApi.ts
+- [x] resetConfig in useOmfgConfig hook
+- [x] InstallationStatus: config_exists, wrapper_exists, installed_version
+- [x] StatusDisplay shows config/wrapper presence
+- [x] defaults.txt updated with OMFG content
+- [x] check_installation dead variable removed, new fields populated
+- [x] InstallationCheckResponse TypedDict updated
+- [x] reset_config in configuration.py + plugin.py
