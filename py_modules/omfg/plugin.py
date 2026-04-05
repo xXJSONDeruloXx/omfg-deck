@@ -60,6 +60,10 @@ class Plugin:
             "debug_views": DEBUG_VIEWS,
         }
 
+    async def reset_omfg_config(self) -> Dict[str, Any]:
+        """Reset omfg-live.toml to factory defaults."""
+        return self.configuration_service.reset_config()
+
     async def get_launch_option(self) -> Dict[str, Any]:
         """Return the Steam launch option string for per-game activation."""
         config_path = str(self.configuration_service.config_file)

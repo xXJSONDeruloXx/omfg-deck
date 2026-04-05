@@ -4,6 +4,7 @@ import {
   checkOmfgInstalled,
   getOmfgConfig,
   saveConfig,
+  resetOmfgConfig,
 } from "../api/omfgApi";
 import { OmfgConfig, getDefaults } from "../config/configSchema";
 
@@ -14,12 +15,24 @@ import { OmfgConfig, getDefaults } from "../config/configSchema";
 export function useInstallationStatus() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [installationStatus, setInstallationStatus] = useState("");
+  const [configExists, setConfigExists] = useState(false);
+  const [wrapperExists, setWrapperExists] = useState(false);
+  const [installedVersion, setInstalledVersion] = useState("");
 
   const checkInstallation = useCallback(async () => {
     try {
       const status = await checkOmfgInstalled();
       setIsInstalled(status.installed);
-      setInstallationStatus(status.installed ? "OMFG layer installed" : "OMFG layer not installed");
+      setConfigExists(status.config_exists ?? false);
+      setWrapperExists(status.wrapper_exists ?? false);
+      setInstalledVersion(status.installed_version ?? "");
+      setInstallationStatus(
+        status.installed
+          ? status.installed_version
+            ? `OMFG layer installed (v${status.installed_version})`
+            : "OMFG layer installed"
+          : "OMFG layer not installed"
+      );
       return status.installed;
     } catch {
       setInstallationStatus("OMFG layer not installed");
@@ -31,7 +44,16 @@ export function useInstallationStatus() {
     checkInstallation();
   }, [checkInstallation]);
 
-  return { isInstalled, installationStatus, setIsInstalled, setInstallationStatus, checkInstallation };
+  return {
+    isInstalled,
+    installationStatus,
+    configExists,
+    wrapperExists,
+    installedVersion,
+    setIsInstalled,
+    setInstallationStatus,
+    checkInstallation,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -75,9 +97,25 @@ export function useOmfgConfig() {
     [config, updateConfig]
   );
 
+  const resetConfig = useCallback(async () => {
+    try {
+      const result = await resetOmfgConfig();
+      if (result.success && result.config) {
+        setConfig(result.config as OmfgConfig);
+        toaster.toast({ title: "Config Reset", body: "Settings restored to defaults" });
+      } else {
+        toaster.toast({ title: "Reset failed", body: result.error ?? "Unknown error" });
+      }
+      return result;
+    } catch (e) {
+      toaster.toast({ title: "Reset failed", body: String(e) });
+      return { success: false, error: String(e) };
+    }
+  }, []);
+
   useEffect(() => {
     loadConfig();
   }, []); // intentionally empty — run once on mount
 
-  return { config, loadConfig, updateConfig, updateField };
+  return { config, loadConfig, updateConfig, updateField, resetConfig };
 }

@@ -108,17 +108,22 @@ class InstallationService(BaseService):
         try:
             lib_ok = self.lib_file.exists()
             json_ok = self.json_file.exists()
-            version = ""
+            config_ok = self.config_file.exists()
+            wrapper_ok = (self.config_dir / WRAPPER_FILENAME).exists()
+            installed_version = ""
             if json_ok:
                 try:
                     manifest = json.loads(self.json_file.read_text())
-                    version = manifest.get("layer", {}).get("implementation_version", "")
+                    installed_version = manifest.get("layer", {}).get("implementation_version", "")
                 except Exception:
                     pass
             return {
                 "installed": lib_ok and json_ok,
                 "lib_exists": lib_ok,
                 "json_exists": json_ok,
+                "config_exists": config_ok,
+                "wrapper_exists": wrapper_ok,
+                "installed_version": installed_version,
                 "lib_path": str(self.lib_file),
                 "json_path": str(self.json_file),
                 "error": None,
@@ -128,6 +133,9 @@ class InstallationService(BaseService):
                 "installed": False,
                 "lib_exists": False,
                 "json_exists": False,
+                "config_exists": False,
+                "wrapper_exists": False,
+                "installed_version": "",
                 "lib_path": str(self.lib_file),
                 "json_path": str(self.json_file),
                 "error": str(e),

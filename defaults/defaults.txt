@@ -1,13 +1,26 @@
-If you have plain-text json configs, theme templates, or templates for usage for your plugin of any description you should have those files be in here.
-Those files will be pulled into the zip during the build process and included with the upload. Example: CssLoader with it's themes in "default/themes" would have the "themes" folder will be added alongside with the dist folder, main.py, LICENSE and README files in the subfolder of the zip containing the plugin.
-Files can also be put in here such as a config, just keep in mind that they this directory cannot be utilized to put files in arbitrary locations, just within the extracted root folder of the plugin, ex: CssLoader has "defaults/themes/..." setup in it's repo, but when packaged to go to the store, the file structure will be:
+# OMFG Deck — Plugin Defaults
 
-- LICENSE
-- README
-- dist
-  - index.js
-- main.py
-- package.json
-- plugin.json
-- themes
-  - exampletheme.css
+This directory holds static assets bundled with the plugin zip.
+
+## omfg-live.toml (written at install time)
+
+The plugin writes a default `omfg-live.toml` to `~/.config/omfg/omfg-live.toml`
+on first install. The layer hot-reloads this file every ~250 ms.
+
+Default values mirror the OMFG project defaults:
+  OMFG_LAYER_MODE = "reproject-blend"
+  OMFG_DEBUG_VIEW = "off"
+  OMFG_REPROJECT_SEARCH_RADIUS = 2
+  OMFG_REPROJECT_PATCH_RADIUS = 1
+  OMFG_MULTI_BLEND_COUNT = 2
+  OMFG_ADAPTIVE_MULTI_TARGET_FPS = 120
+  (... see plugin UI for all fields)
+
+## omfg-wrapper.sh (written at install time)
+
+The plugin writes `~/.config/omfg/omfg-wrapper.sh` as an optional launch wrapper.
+Use as Steam Launch Option:
+  /home/deck/.config/omfg/omfg-wrapper.sh %command%
+
+Or use the raw env-var form (shown in plugin UI clipboard button):
+  ENABLE_OMFG_RUST=1 OMFG_HOT_CONFIG_PATH=/home/deck/.config/omfg/omfg-live.toml %command%

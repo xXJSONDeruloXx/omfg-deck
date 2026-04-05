@@ -21,6 +21,9 @@ class InstallationCheckResponse(TypedDict):
     installed: bool
     lib_exists: bool
     json_exists: bool
+    config_exists: bool
+    wrapper_exists: bool
+    installed_version: str
     lib_path: str
     json_path: str
     error: Optional[str]

@@ -13,6 +13,9 @@ export interface InstallationStatus {
   installed: boolean;
   lib_exists: boolean;
   json_exists: boolean;
+  config_exists: boolean;
+  wrapper_exists: boolean;
+  installed_version: string;
   lib_path: string;
   json_path: string;
   error?: string;
@@ -62,6 +65,7 @@ export const checkOmfgInstalled = callable<[], InstallationStatus>("check_omfg_i
 export const getOmfgConfig = callable<[], ConfigResult>("get_omfg_config");
 /** config is passed as a JSON string to avoid positional-arg explosion */
 export const updateOmfgConfig = callable<[config_json: string], ConfigResult>("update_omfg_config");
+export const resetOmfgConfig = callable<[], ConfigResult>("reset_omfg_config");
 
 export const getConfigSchema = callable<[], SchemaResult>("get_config_schema");
 export const getLaunchOption = callable<[], LaunchOptionResult>("get_launch_option");

@@ -14,14 +14,17 @@ export function Content() {
   const {
     isInstalled,
     installationStatus,
+    configExists,
+    wrapperExists,
     setIsInstalled,
     setInstallationStatus,
+    checkInstallation,
   } = useInstallationStatus();
 
-  const { config, loadConfig, updateField } = useOmfgConfig();
+  const { config, loadConfig, updateField, resetConfig } = useOmfgConfig();
   const { isInstalling, isUninstalling, handleInstall, handleUninstall } = useInstallationActions();
 
-  // Reload config when layer becomes installed
+  // Re-check full status after install/uninstall
   useEffect(() => {
     if (isInstalled) {
       loadConfig();
@@ -29,7 +32,10 @@ export function Content() {
   }, [isInstalled, loadConfig]);
 
   const onInstall = () =>
-    handleInstall(setIsInstalled, setInstallationStatus, loadConfig);
+    handleInstall(setIsInstalled, setInstallationStatus, async () => {
+      await loadConfig();
+      await checkInstallation();
+    });
 
   const onUninstall = () =>
     handleUninstall(setIsInstalled, setInstallationStatus);
@@ -54,12 +60,15 @@ export function Content() {
       <StatusDisplay
         isInstalled={isInstalled}
         installationStatus={installationStatus}
+        configExists={configExists}
+        wrapperExists={wrapperExists}
       />
 
       {isInstalled && (
         <ConfigurationSection
           config={config}
           onFieldChange={handleFieldChange}
+          onReset={resetConfig}
         />
       )}
 
