@@ -2,7 +2,6 @@
 Base service class with common path helpers.
 """
 
-import os
 import tempfile
 from pathlib import Path
 from typing import Any, Optional

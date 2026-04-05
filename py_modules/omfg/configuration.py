@@ -2,11 +2,11 @@
 Configuration service: reads / writes omfg-live.toml.
 """
 
-import json
+import shutil
 from typing import Dict, Any
 
 from .base_service import BaseService
-from .config_schema import ConfigurationManager, OmfgConfig
+from .config_schema import ConfigurationManager
 from .types import ConfigurationResponse
 
 
@@ -26,12 +26,7 @@ class ConfigurationService(BaseService):
             return {"success": True, "config": config, "message": None, "error": None}
         except Exception as e:
             self.log.error(f"Error reading config: {e}")
-            return {
-                "success": False,
-                "config": None,
-                "message": None,
-                "error": str(e),
-            }
+            return {"success": False, "config": None, "message": None, "error": str(e)}
 
     def update_config(self, config_dict: Dict[str, Any]) -> ConfigurationResponse:
         try:
@@ -45,12 +40,18 @@ class ConfigurationService(BaseService):
             self.log.error(f"Error updating config: {e}")
             return {"success": False, "config": None, "message": None, "error": str(e)}
 
+    def update_field(self, key: str, value: Any) -> ConfigurationResponse:
+        """Update a single field by env-var name without touching the rest."""
+        current_resp = self.get_config()
+        config: dict = dict(current_resp.get("config") or ConfigurationManager.get_defaults())
+        config[key] = value
+        return self.update_config(config)
+
     def reset_config(self) -> ConfigurationResponse:
         """Reset config file to defaults, preserving existing file as backup."""
         try:
             if self.config_file.exists():
                 backup = self.config_file.with_suffix(".toml.bak")
-                import shutil
                 shutil.copy2(self.config_file, backup)
                 self.log.info(f"Backed up config to {backup}")
             defaults = ConfigurationManager.get_defaults()
@@ -62,8 +63,3 @@ class ConfigurationService(BaseService):
         except Exception as e:
             self.log.error(f"Error resetting config: {e}")
             return {"success": False, "config": None, "message": None, "error": str(e)}
-        """Convenience: update a single field by env-var name."""
-        current_resp = self.get_config()
-        config: dict = dict(current_resp.get("config") or ConfigurationManager.get_defaults())
-        config[key] = value
-        return self.update_config(config)

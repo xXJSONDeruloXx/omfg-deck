@@ -117,7 +117,6 @@ class Plugin:
 
     async def download_plugin_update(self, download_url: str) -> Dict[str, Any]:
         try:
-            import decky
             dst = Path.home() / "Downloads" / "omfg-deck.zip"
             dst.parent.mkdir(exist_ok=True)
             ctx = ssl.create_default_context()

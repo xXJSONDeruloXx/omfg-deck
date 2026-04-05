@@ -5,20 +5,18 @@ hot-reload config.
 """
 
 import json
-import os
 import shutil
 import ssl
 import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Dict, Any
 
 from .base_service import BaseService
 from .config_schema import ConfigurationManager
 from .constants import (
     GITHUB_API_URL, RELEASE_ASSET_SUFFIX,
-    LIB_FILENAME, JSON_FILENAME, SHADERS_DIR, CONFIG_FILENAME,
+    LIB_FILENAME, JSON_FILENAME, SHADERS_DIR, WRAPPER_FILENAME,
 )
 from .types import InstallationResponse, UninstallationResponse, InstallationCheckResponse
 

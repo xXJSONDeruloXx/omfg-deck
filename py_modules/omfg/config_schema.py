@@ -8,7 +8,6 @@ required.
 """
 
 from typing import TypedDict, Dict, Any, cast
-from .constants import ALL_LAYER_MODES, DEBUG_VIEWS
 
 
 # ---------------------------------------------------------------------------

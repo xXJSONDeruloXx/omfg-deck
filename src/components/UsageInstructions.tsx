@@ -14,10 +14,36 @@ export function UsageInstructions({ config }: UsageInstructionsProps) {
   const handleCopy = async () => {
     try {
       const result = await getLaunchOption();
-      if (result.success && result.launch_option) {
-        if (typeof navigator !== "undefined" && navigator.clipboard) {
-          await navigator.clipboard.writeText(result.launch_option);
+      if (!result.success || !result.launch_option) return;
+
+      const text = result.launch_option;
+      let success = false;
+
+      // navigator.clipboard requires a secure context; Steam CEF may not provide one.
+      // Try it first, fall back to the execCommand textarea trick.
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          success = true;
+        } catch {
+          // fall through to execCommand
         }
+      }
+
+      if (!success) {
+        // execCommand works in older Chromium (Steam's CEF)
+        const el = document.createElement("textarea");
+        el.value = text;
+        el.style.position = "fixed";
+        el.style.opacity = "0";
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        success = document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+
+      if (success) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
       }
