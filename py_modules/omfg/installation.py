@@ -225,30 +225,87 @@ class InstallationService(BaseService):
         self.log.info(f"Wrote default config → {self.config_file}")
 
     def _write_wrapper_script(self) -> None:
-        """Write an optional omfg-wrapper.sh the user can use as a Steam launch option."""
+        """Write omfg-wrapper.sh — full env setup with workaround translation."""
         wrapper_path = self.config_dir / WRAPPER_FILENAME
         config_path = str(self.config_file)
         env_file = str(self.config_dir / "omfg.env")
+        layer_dir = str(self.lib_dir)
+        layer_name = "VK_LAYER_OMFG_rust"
         script = f"""#!/usr/bin/env bash
 # OMFG wrapper script — managed by omfg-deck Decky plugin
 # Usage (Steam Launch Options):  {wrapper_path} %command%
 set -euo pipefail
 
-# Source global enable/disable override if present
+# Source plugin-managed flags (OMFG_DISABLE_LAYER, WORKAROUND_* etc.)
 if [[ -f "{env_file}" ]]; then
   # shellcheck disable=SC1090
   set -a; source "{env_file}"; set +a
 fi
 
-# Respect global disable flag written by the Decky plugin
+# Respect global disable flag
 if [[ "${{OMFG_DISABLE_LAYER:-0}}" == "1" ]]; then
   exec "$@"
 fi
 
+# Workaround: disable vSync (Mesa immediate present mode)
+if [[ "${{WORKAROUND_MESA_IMMEDIATE:-0}}" == "1" ]]; then
+  export MESA_VK_WSI_PRESENT_MODE=immediate
+fi
+
+# Workaround: vkbasalt (mutually exclusive)
+if [[ "${{WORKAROUND_DISABLE_VKBASALT:-0}}" == "1" ]]; then
+  export DISABLE_VKBASALT=1
+elif [[ "${{WORKAROUND_FORCE_ENABLE_VKBASALT:-0}}" == "1" ]]; then
+  export ENABLE_VKBASALT=1
+fi
+
+# Workaround: DXVK base fps cap
+if [[ "${{WORKAROUND_DXVK_FRAME_RATE:-0}}" != "0" ]]; then
+  export DXVK_FRAME_RATE="${{WORKAROUND_DXVK_FRAME_RATE}}"
+fi
+
+# Workaround: 32-bit ProtonGE WoW64
+if [[ "${{WORKAROUND_ENABLE_WOW64:-0}}" == "1" ]]; then
+  export PROTON_USE_WOW64=1
+fi
+
+# Workaround: disable Steam Deck mode
+if [[ "${{WORKAROUND_DISABLE_STEAMDECK:-0}}" == "1" ]]; then
+  export SteamDeck=0
+fi
+
+# Workaround: MangoHud overlay
+if [[ "${{WORKAROUND_MANGOHUD:-0}}" == "1" ]]; then
+  export MANGOHUD=1
+fi
+
+# Workaround: Gamescope WSI (disabled by default — conflicts with frame gen)
+if [[ "${{WORKAROUND_ENABLE_GAMESCOPE_WSI:-0}}" != "1" ]]; then
+  export ENABLE_GAMESCOPE_WSI=0
+  export DXVK_HDR=0
+fi
+
+# Workaround: Zink (Vulkan-based OpenGL)
+if [[ "${{WORKAROUND_ENABLE_ZINK:-0}}" == "1" ]]; then
+  export __GLX_VENDOR_LIBRARY_NAME=mesa
+  export MESA_LOADER_DRIVER_OVERRIDE=zink
+  export GALLIUM_DRIVER=zink
+fi
+
+# Expose layer directory inside Pressure Vessel (Proton container)
+if [[ -n "${{PRESSURE_VESSEL_FILESYSTEMS_RW:-}}" ]]; then
+  export PRESSURE_VESSEL_FILESYSTEMS_RW="{layer_dir}:${{PRESSURE_VESSEL_FILESYSTEMS_RW}}"
+else
+  export PRESSURE_VESSEL_FILESYSTEMS_RW="{layer_dir}"
+fi
+
+# Explicit layer activation (belt-and-suspenders alongside implicit_layer.d manifest)
+export VK_LAYER_PATH="{layer_dir}${{VK_LAYER_PATH:+:${{VK_LAYER_PATH}}}}"
+export VK_INSTANCE_LAYERS="{layer_name}"
 export ENABLE_OMFG_RUST=1
 export OMFG_HOT_CONFIG_PATH="{config_path}"
 
-# Ensure log directory exists
+# Log setup
 mkdir -p "${{HOME}}/.local/share/omfg/logs"
 export OMFG_LAYER_LOG_FILE="${{HOME}}/.local/share/omfg/logs/omfg.log"
 

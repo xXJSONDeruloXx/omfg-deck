@@ -428,14 +428,14 @@ class TestWorkarounds:
 
     def test_set_mesa_immediate_on(self, patched_home):
         plugin = make_plugin(patched_home)
-        run(plugin.set_workaround("mesa_immediate", True))
+        run(plugin.set_workaround("mesa_immediate", "1"))
         result = run(plugin.get_workarounds())
         assert result["mesa_immediate"] is True
         assert result["disable_vkbasalt"] is False   # other unchanged
 
     def test_set_disable_vkbasalt_on(self, patched_home):
         plugin = make_plugin(patched_home)
-        run(plugin.set_workaround("disable_vkbasalt", True))
+        run(plugin.set_workaround("disable_vkbasalt", "1"))
         result = run(plugin.get_workarounds())
         assert result["disable_vkbasalt"] is True
 
@@ -443,39 +443,41 @@ class TestWorkarounds:
         """Setting a workaround must not clobber the layer-enabled flag."""
         plugin = make_plugin(patched_home)
         run(plugin.set_layer_enabled(False))
-        run(plugin.set_workaround("mesa_immediate", True))
+        run(plugin.set_workaround("mesa_immediate", "1"))
         assert run(plugin.get_layer_enabled())["enabled"] is False
         assert run(plugin.get_workarounds())["mesa_immediate"] is True
 
     def test_invalid_key_returns_error(self, patched_home):
         plugin = make_plugin(patched_home)
-        result = run(plugin.set_workaround("nonexistent_key", True))
+        result = run(plugin.set_workaround("nonexistent_key", "1"))
         assert result["success"] is False
 
     def test_get_launch_option_includes_mesa_when_enabled(self, patched_home):
         plugin = make_plugin(patched_home)
-        run(plugin.set_workaround("mesa_immediate", True))
+        run(plugin.set_workaround("mesa_immediate", "1"))
         result = run(plugin.get_launch_option())
         assert "MESA_VK_WSI_PRESENT_MODE=immediate" in result["launch_option"]
 
     def test_get_launch_option_includes_vkbasalt_when_enabled(self, patched_home):
         plugin = make_plugin(patched_home)
-        run(plugin.set_workaround("disable_vkbasalt", True))
+        run(plugin.set_workaround("disable_vkbasalt", "1"))
         result = run(plugin.get_launch_option())
         assert "DISABLE_VKBASALT=1" in result["launch_option"]
 
     def test_get_launch_option_no_workarounds_by_default(self, patched_home):
         plugin = make_plugin(patched_home)
         result = run(plugin.get_launch_option())
-        assert "MESA" not in result["launch_option"]
+        # By default: no MESA, no VKBASALT, but ENABLE_GAMESCOPE_WSI=0 IS present (default off)
+        assert "MESA_VK_WSI_PRESENT_MODE" not in result["launch_option"]
         assert "VKBASALT" not in result["launch_option"]
+        assert "ENABLE_GAMESCOPE_WSI=0" in result["launch_option"]
         assert "ENABLE_OMFG_RUST=1" in result["launch_option"]
 
     def test_get_launch_option_ordering(self, patched_home):
         """Workarounds should appear before ENABLE_OMFG_RUST."""
         plugin = make_plugin(patched_home)
-        run(plugin.set_workaround("mesa_immediate", True))
-        run(plugin.set_workaround("disable_vkbasalt", True))
+        run(plugin.set_workaround("mesa_immediate", "1"))
+        run(plugin.set_workaround("disable_vkbasalt", "1"))
         opt = run(plugin.get_launch_option())["launch_option"]
         mesa_pos = opt.index("MESA")
         omfg_pos = opt.index("ENABLE_OMFG_RUST")
@@ -492,7 +494,139 @@ class TestWorkaroundsExceptions:
 
     def test_set_workaround_write_failure_returns_error(self, patched_home, monkeypatch):
         plugin = make_plugin(patched_home)
-        with patch.object(plugin, "_set_env_flag", side_effect=OSError("disk full")):
-            result = run(plugin.set_workaround("mesa_immediate", True))
+        with patch.object(plugin, "_write_env", side_effect=OSError("disk full")):
+            result = run(plugin.set_workaround("mesa_immediate", "1"))
         assert result["success"] is False
         assert result["error"] is not None
+
+
+# ---------------------------------------------------------------------------
+# New methods: full workaround prefix, wrapper launch option,
+# config/wrapper file content, mutex branches
+# ---------------------------------------------------------------------------
+
+class TestNewParityMethods:
+    # -- _build_workaround_prefix: all branches --
+    def test_force_enable_vkbasalt_branch(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("force_enable_vkbasalt", "1"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "ENABLE_VKBASALT=1" in opt
+
+    def test_dxvk_frame_rate_branch(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("dxvk_frame_rate", "30"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "DXVK_FRAME_RATE=30" in opt
+
+    def test_wow64_branch(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("enable_wow64", "1"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "PROTON_USE_WOW64=1" in opt
+
+    def test_steamdeck_branch(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("disable_steamdeck", "1"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "SteamDeck=0" in opt
+
+    def test_mangohud_branch(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("mangohud", "1"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "MANGOHUD=1" in opt
+
+    def test_gamescope_wsi_enabled_skips_disable(self, patched_home):
+        """When enable_gamescope_wsi=1, the default disable block is skipped."""
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("enable_gamescope_wsi", "1"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "ENABLE_GAMESCOPE_WSI=0" not in opt
+
+    def test_zink_branch(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("enable_zink", "1"))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        assert "__GLX_VENDOR_LIBRARY_NAME=mesa" in opt
+        assert "MESA_LOADER_DRIVER_OVERRIDE=zink" in opt
+        assert "GALLIUM_DRIVER=zink" in opt
+
+    # -- mutex --
+    def test_disable_vkbasalt_clears_force_enable(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("force_enable_vkbasalt", "1"))
+        run(plugin.set_workaround("disable_vkbasalt", "1"))
+        w = run(plugin.get_workarounds())
+        assert w["disable_vkbasalt"] is True
+        assert w["force_enable_vkbasalt"] is False
+
+    def test_force_enable_clears_disable_vkbasalt(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("disable_vkbasalt", "1"))
+        run(plugin.set_workaround("force_enable_vkbasalt", "1"))
+        w = run(plugin.get_workarounds())
+        assert w["force_enable_vkbasalt"] is True
+        assert w["disable_vkbasalt"] is False
+
+    # -- get_wrapper_launch_option --
+    def test_wrapper_launch_option(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_wrapper_launch_option())
+        assert result["success"] is True
+        assert "omfg-wrapper.sh" in result["launch_option"]
+        assert "%command%" in result["launch_option"]
+
+    # -- get_config_file_content --
+    def test_config_file_content_when_exists(self, patched_home):
+        plugin = make_plugin(patched_home)
+        svc = plugin.configuration_service
+        svc.config_dir.mkdir(parents=True, exist_ok=True)
+        svc.config_file.write_text("[env]\nOMFG_LAYER_MODE = \"blend\"\n")
+        result = run(plugin.get_config_file_content())
+        assert result["success"] is True
+        assert "OMFG_LAYER_MODE" in result["content"]
+
+    def test_config_file_content_when_missing(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_config_file_content())
+        assert result["success"] is True
+        assert result["content"] == ""
+
+    def test_config_file_content_exception(self, patched_home):
+        plugin = make_plugin(patched_home)
+        svc = plugin.configuration_service
+        svc.config_dir.mkdir(parents=True, exist_ok=True)
+        svc.config_file.write_text("x")
+        from unittest.mock import patch as _patch
+        with _patch.object(Path, "read_text", side_effect=OSError("perm")):
+            result = run(plugin.get_config_file_content())
+        assert result["success"] is False
+
+    # -- get_wrapper_script_content --
+    def test_wrapper_content_when_exists(self, patched_home):
+        plugin = make_plugin(patched_home)
+        svc = plugin.installation_service
+        svc._ensure_directories()
+        wrapper = svc.config_dir / "omfg-wrapper.sh"
+        wrapper.write_text("#!/bin/bash\nexec \"$@\"\n")
+        result = run(plugin.get_wrapper_script_content())
+        assert result["success"] is True
+        assert "exec" in result["content"]
+
+    def test_wrapper_content_when_missing(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_wrapper_script_content())
+        assert result["success"] is True
+        assert result["content"] == ""
+
+    def test_wrapper_content_exception(self, patched_home):
+        plugin = make_plugin(patched_home)
+        svc = plugin.installation_service
+        svc._ensure_directories()
+        wrapper = svc.config_dir / "omfg-wrapper.sh"
+        wrapper.write_text("#!/bin/bash")
+        from unittest.mock import patch as _patch
+        with _patch.object(Path, "read_text", side_effect=OSError("perm")):
+            result = run(plugin.get_wrapper_script_content())
+        assert result["success"] is False

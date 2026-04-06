@@ -1,115 +1,97 @@
 import { useState } from "react";
-import { PanelSectionRow, ButtonItem } from "@decky/ui";
+import { PanelSectionRow, ButtonItem, ToggleField } from "@decky/ui";
 import { FaClipboard } from "react-icons/fa";
-import { getLaunchOption } from "../api/omfgApi";
+import { getLaunchOption, getWrapperLaunchOption } from "../api/omfgApi";
 import { OmfgConfig, isMultiMode, isAdaptiveMode } from "../config/configSchema";
 
 interface UsageInstructionsProps {
   config: OmfgConfig;
 }
 
+const CLIPBOARD_MODE_KEY = "omfg-clipboard-mode-wrapper";
+
+function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => execCopy(text));
+  } else {
+    execCopy(text);
+  }
+}
+
+function execCopy(text: string) {
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.style.position = "fixed"; el.style.opacity = "0";
+  document.body.appendChild(el); el.focus(); el.select();
+  document.execCommand("copy");
+  document.body.removeChild(el);
+}
+
 export function UsageInstructions({ config }: UsageInstructionsProps) {
   const [copied, setCopied] = useState(false);
+  const [useWrapper, setUseWrapper] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CLIPBOARD_MODE_KEY) ?? "false"); }
+    catch { return false; }
+  });
+
+  const handleModeChange = (v: boolean) => {
+    setUseWrapper(v);
+    try { localStorage.setItem(CLIPBOARD_MODE_KEY, JSON.stringify(v)); } catch {}
+  };
 
   const handleCopy = async () => {
     try {
-      const result = await getLaunchOption();
-      if (!result.success || !result.launch_option) return;
-
-      const text = result.launch_option;
-      let success = false;
-
-      // navigator.clipboard requires a secure context; Steam CEF may not provide one.
-      // Try it first, fall back to the execCommand textarea trick.
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-          success = true;
-        } catch {
-          // fall through to execCommand
-        }
-      }
-
-      if (!success) {
-        // execCommand works in older Chromium (Steam's CEF)
-        const el = document.createElement("textarea");
-        el.value = text;
-        el.style.position = "fixed";
-        el.style.opacity = "0";
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        success = document.execCommand("copy");
-        document.body.removeChild(el);
-      }
-
-      if (success) {
+      const result = useWrapper
+        ? await getWrapperLaunchOption()
+        : await getLaunchOption();
+      if (result.success && result.launch_option) {
+        copyText(result.launch_option);
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
       }
     } catch (e) {
-      console.error("Failed to copy launch option:", e);
+      console.error("copy failed:", e);
     }
   };
 
   const showMulti = isMultiMode(config.OMFG_LAYER_MODE);
   const showAdaptive = isAdaptiveMode(config.OMFG_LAYER_MODE);
 
-  const configSummaryLines = [
+  const configSummary = [
     `• Mode: ${config.OMFG_LAYER_MODE}`,
     `• Debug: ${config.OMFG_DEBUG_VIEW}`,
     ...(showMulti ? [`• Generated frames: ${config.OMFG_MULTI_BLEND_COUNT}`] : []),
-    ...(showAdaptive
-      ? [
-          `• Target FPS: ${config.OMFG_ADAPTIVE_MULTI_TARGET_FPS}`,
-          `• Generated min/max: ${config.OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES}–${config.OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES}`,
-        ]
-      : []),
+    ...(showAdaptive ? [
+      `• Target FPS: ${config.OMFG_ADAPTIVE_MULTI_TARGET_FPS}`,
+      `• Min/Max: ${config.OMFG_ADAPTIVE_MULTI_MIN_GENERATED_FRAMES}–${config.OMFG_ADAPTIVE_MULTI_MAX_GENERATED_FRAMES}`,
+    ] : []),
     `• Present timing: ${config.OMFG_PRESENT_TIMING === 1 ? "on" : "off"}`,
     `• Benchmark: ${config.OMFG_BENCHMARK === 1 ? "on" : "off"}`,
-  ];
+  ].join("\n");
 
   return (
     <>
       <PanelSectionRow>
-        <div
-          style={{
-            fontSize: "13px",
-            fontWeight: "bold",
-            marginTop: "12px",
-            marginBottom: "6px",
-            borderBottom: "1px solid rgba(255,255,255,0.2)",
-            paddingBottom: "4px",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}
-        >
+        <div style={{
+          fontSize: "13px", fontWeight: "bold", marginTop: "12px", marginBottom: "6px",
+          borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "4px",
+          textTransform: "uppercase", letterSpacing: "0.05em",
+        }}>
           Usage
         </div>
       </PanelSectionRow>
 
       <PanelSectionRow>
-        <div style={{ fontSize: "12px", lineHeight: "1.5", opacity: 0.85 }}>
-          Add to each game's <strong>Launch Options</strong>:
-        </div>
-      </PanelSectionRow>
-
-      <PanelSectionRow>
-        <div
-          style={{
-            fontFamily: "monospace",
-            fontSize: "10px",
-            background: "rgba(0,0,0,0.35)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: "4px",
-            padding: "6px 8px",
-            wordBreak: "break-all",
-            lineHeight: "1.5",
-            color: "#a8d8a8",
-          }}
-        >
-          ENABLE_OMFG_RUST=1 OMFG_HOT_CONFIG_PATH=~/.config/omfg/omfg-live.toml %command%
-        </div>
+        <ToggleField
+          label={useWrapper ? "Mode: Wrapper Script" : "Mode: Inline Env Vars"}
+          description={
+            useWrapper
+              ? "/home/deck/.config/omfg/omfg-wrapper.sh %command%  — wrkaround vars applied automatically"
+              : "Full env var string — workarounds prepended from Workarounds section"
+          }
+          checked={useWrapper}
+          onChange={handleModeChange}
+        />
       </PanelSectionRow>
 
       <PanelSectionRow>
@@ -122,23 +104,17 @@ export function UsageInstructions({ config }: UsageInstructionsProps) {
       </PanelSectionRow>
 
       <PanelSectionRow>
-        <div
-          style={{
-            fontSize: "12px",
-            lineHeight: "1.55",
-            opacity: 0.75,
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          {configSummaryLines.join("\n")}
+        <div style={{
+          fontSize: "12px", lineHeight: "1.55", opacity: 0.75, whiteSpace: "pre-wrap",
+        }}>
+          {configSummary}
         </div>
       </PanelSectionRow>
 
       <PanelSectionRow>
-        <div style={{ fontSize: "11px", opacity: 0.55, marginTop: "4px" }}>
-          Config file: <code>~/.config/omfg/omfg-live.toml</code>
-          <br />
-          Changes apply within ~250 ms — no restart needed.
+        <div style={{ fontSize: "11px", opacity: 0.55 }}>
+          Config: <code>~/.config/omfg/omfg-live.toml</code>
+          <br />Changes apply within ~250 ms — no restart needed.
         </div>
       </PanelSectionRow>
     </>

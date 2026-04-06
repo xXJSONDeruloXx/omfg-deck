@@ -7,3 +7,4 @@ export { UsageInstructions } from "./UsageInstructions";
 export { PluginUpdateChecker } from "./PluginUpdateChecker";
 export { GitHubButton } from "./GitHubButton";
 export { LogViewer } from "./LogViewer";
+export { NerdStuffModal } from "./NerdStuffModal";

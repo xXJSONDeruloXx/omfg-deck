@@ -54,13 +54,27 @@ export interface WorkaroundsResult {
   success: boolean;
   mesa_immediate: boolean;
   disable_vkbasalt: boolean;
+  force_enable_vkbasalt: boolean;
+  dxvk_frame_rate: number;
+  enable_wow64: boolean;
+  disable_steamdeck: boolean;
+  mangohud: boolean;
+  enable_gamescope_wsi: boolean;
+  enable_zink: boolean;
   error?: string;
 }
 
 export interface SetWorkaroundResult {
   success: boolean;
   key?: string;
-  enabled?: boolean;
+  value?: string;
+  error?: string;
+}
+
+export interface FileContentResult {
+  success: boolean;
+  content: string;
+  message?: string;
   error?: string;
 }
 
@@ -99,7 +113,11 @@ export const setLayerEnabled  = callable<[enabled: boolean], LayerEnabledResult>
 export const getLayerLog      = callable<[lines: number], LayerLogResult>("get_layer_log");
 
 export const getWorkarounds   = callable<[], WorkaroundsResult>("get_workarounds");
-export const setWorkaround    = callable<[key: string, enabled: boolean], SetWorkaroundResult>("set_workaround");
+export const setWorkaround    = callable<[key: string, value: string], SetWorkaroundResult>("set_workaround");
+
+export const getConfigFileContent   = callable<[], FileContentResult>("get_config_file_content");
+export const getWrapperScriptContent = callable<[], FileContentResult>("get_wrapper_script_content");
+export const getWrapperLaunchOption  = callable<[], LaunchOptionResult>("get_wrapper_launch_option");
 
 export const checkForPluginUpdate  = callable<[], UpdateCheckResult>("check_for_plugin_update");
 export const downloadPluginUpdate  = callable<[download_url: string], UpdateDownloadResult>("download_plugin_update");

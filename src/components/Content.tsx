@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { PanelSection, PanelSectionRow, ToggleField } from "@decky/ui";
+import { PanelSection, PanelSectionRow, ToggleField, ButtonItem, showModal } from "@decky/ui";
+import { FaTools } from "react-icons/fa";
 import { useInstallationStatus, useOmfgConfig, useLayerEnabled } from "../hooks/useOmfgHooks";
 import { useInstallationActions } from "../hooks/useInstallationActions";
 import { useWorkarounds } from "../hooks/useWorkarounds";
@@ -11,6 +12,7 @@ import { UsageInstructions } from "./UsageInstructions";
 import { PluginUpdateChecker } from "./PluginUpdateChecker";
 import { GitHubButton } from "./GitHubButton";
 import { LogViewer } from "./LogViewer";
+import { NerdStuffModal } from "./NerdStuffModal";
 import { OmfgConfig } from "../config/configSchema";
 import { WorkaroundState } from "../hooks/useWorkarounds";
 
@@ -27,7 +29,7 @@ export function Content() {
 
   const { config, loadConfig, updateField, resetConfig } = useOmfgConfig();
   const { layerEnabled, toggleEnabled } = useLayerEnabled();
-  const { workarounds, toggle: toggleWorkaround } = useWorkarounds();
+  const { workarounds, toggle: toggleWorkaround, setInt: setWorkaroundInt } = useWorkarounds();
   const { isInstalling, isUninstalling, handleInstall, handleUninstall } = useInstallationActions();
 
   useEffect(() => {
@@ -39,28 +41,27 @@ export function Content() {
       await loadConfig();
       await checkInstallation();
     });
-
   const onUninstall = () => handleUninstall(setIsInstalled, setInstallationStatus);
 
   const handleFieldChange = async (key: keyof OmfgConfig, value: OmfgConfig[keyof OmfgConfig]) => {
     await updateField(key, value);
   };
 
-  const handleWorkaroundToggle = async (key: keyof WorkaroundState, enabled: boolean) => {
-    await toggleWorkaround(key, enabled);
-  };
+  const handleWorkaroundToggle = async (key: keyof WorkaroundState, enabled: boolean) =>
+    toggleWorkaround(key, enabled);
+
+  const handleWorkaroundInt = async (key: keyof WorkaroundState, value: number) =>
+    setWorkaroundInt(key, value);
 
   return (
     <PanelSection>
-      {/* Global enable/disable — most prominent control */}
+      {/* Global enable/disable */}
       <PanelSectionRow>
         <ToggleField
           label="OMFG Enabled"
-          description={
-            layerEnabled
-              ? "Layer will activate on games using the wrapper launch option"
-              : "Layer is globally disabled — games will run without OMFG"
-          }
+          description={layerEnabled
+            ? "Layer activates on games using the wrapper/launch option"
+            : "Layer is globally disabled — games run without OMFG"}
           checked={layerEnabled}
           onChange={toggleEnabled}
         />
@@ -92,11 +93,24 @@ export function Content() {
       <WorkaroundsSection
         workarounds={workarounds}
         onToggle={handleWorkaroundToggle}
+        onSetInt={handleWorkaroundInt}
       />
 
       <UsageInstructions config={config} />
 
       {isInstalled && <LogViewer />}
+
+      {/* Nerd Stuff */}
+      {isInstalled && (
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={() => showModal(<NerdStuffModal />)}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <FaTools />
+              <div>Nerd Stuff</div>
+            </div>
+          </ButtonItem>
+        </PanelSectionRow>
+      )}
 
       <GitHubButton />
 

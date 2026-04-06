@@ -16,7 +16,37 @@ from .constants import (
     ALL_LAYER_MODES, DEBUG_VIEWS,
     LAYER_ENABLE_ENV, HOT_CONFIG_ENV,
     ENV_FILENAME, LOG_FILENAME,
+    WRAPPER_FILENAME,
 )
+
+
+def _build_workaround_prefix(flags: Dict[str, str]) -> list:
+    """Translate WORKAROUND_* flags from omfg.env into ordered env-var strings."""
+    parts = []
+    if flags.get("WORKAROUND_MESA_IMMEDIATE", "0") == "1":
+        parts.append("MESA_VK_WSI_PRESENT_MODE=immediate")
+    if flags.get("WORKAROUND_DISABLE_VKBASALT", "0") == "1":
+        parts.append("DISABLE_VKBASALT=1")
+    elif flags.get("WORKAROUND_FORCE_ENABLE_VKBASALT", "0") == "1":
+        parts.append("ENABLE_VKBASALT=1")
+    fps = flags.get("WORKAROUND_DXVK_FRAME_RATE", "0")
+    if fps and fps != "0":
+        parts.append(f"DXVK_FRAME_RATE={fps}")
+    if flags.get("WORKAROUND_ENABLE_WOW64", "0") == "1":
+        parts.append("PROTON_USE_WOW64=1")
+    if flags.get("WORKAROUND_DISABLE_STEAMDECK", "0") == "1":
+        parts.append("SteamDeck=0")
+    if flags.get("WORKAROUND_MANGOHUD", "0") == "1":
+        parts.append("MANGOHUD=1")
+    if flags.get("WORKAROUND_ENABLE_GAMESCOPE_WSI", "0") != "1":
+        # Default: disable Gamescope WSI (conflicts with frame gen)
+        parts.append("ENABLE_GAMESCOPE_WSI=0")
+        parts.append("DXVK_HDR=0")
+    if flags.get("WORKAROUND_ENABLE_ZINK", "0") == "1":
+        parts.append("__GLX_VENDOR_LIBRARY_NAME=mesa")
+        parts.append("MESA_LOADER_DRIVER_OVERRIDE=zink")
+        parts.append("GALLIUM_DRIVER=zink")
+    return parts
 
 
 class Plugin:
@@ -69,20 +99,14 @@ class Plugin:
         """Return the Steam launch option string, including active workarounds."""
         config_path = str(self.configuration_service.config_file)
         flags = self._read_env()
+        prefix = _build_workaround_prefix(flags)
+        prefix += [f"{LAYER_ENABLE_ENV}=1", f"{HOT_CONFIG_ENV}={config_path}"]
+        return {"success": True, "launch_option": " ".join(prefix) + " %command%"}
 
-        # Build prefix from active workarounds
-        prefix_parts = []
-        if flags.get("WORKAROUND_MESA_IMMEDIATE", "0") == "1":
-            prefix_parts.append("MESA_VK_WSI_PRESENT_MODE=immediate")
-        if flags.get("WORKAROUND_DISABLE_VKBASALT", "0") == "1":
-            prefix_parts.append("DISABLE_VKBASALT=1")
-
-        prefix_parts += [
-            f"{LAYER_ENABLE_ENV}=1",
-            f"{HOT_CONFIG_ENV}={config_path}",
-        ]
-        launch_opt = " ".join(prefix_parts) + " %command%"
-        return {"success": True, "launch_option": launch_opt}
+    async def get_wrapper_launch_option(self) -> Dict[str, Any]:
+        """Return the wrapper-script form of the launch option."""
+        wrapper = str(self.installation_service.config_dir / "omfg-wrapper.sh")
+        return {"success": True, "launch_option": f"{wrapper} %command%"}
 
     # ------------------------------------------------------------------
     # omfg.env: shared key/value store for plugin-managed flags
@@ -152,26 +176,56 @@ class Plugin:
     async def get_workarounds(self) -> Dict[str, Any]:
         """Return the current state of all workaround flags."""
         try:
-            flags = self._read_env()
+            f = self._read_env()
             return {
                 "success": True,
-                "mesa_immediate": flags.get("WORKAROUND_MESA_IMMEDIATE", "0") == "1",
-                "disable_vkbasalt": flags.get("WORKAROUND_DISABLE_VKBASALT", "0") == "1",
+                "mesa_immediate":        f.get("WORKAROUND_MESA_IMMEDIATE",   "0") == "1",
+                "disable_vkbasalt":      f.get("WORKAROUND_DISABLE_VKBASALT", "0") == "1",
+                "force_enable_vkbasalt": f.get("WORKAROUND_FORCE_ENABLE_VKBASALT", "0") == "1",
+                "dxvk_frame_rate":       int(f.get("WORKAROUND_DXVK_FRAME_RATE", "0")),
+                "enable_wow64":          f.get("WORKAROUND_ENABLE_WOW64",     "0") == "1",
+                "disable_steamdeck":     f.get("WORKAROUND_DISABLE_STEAMDECK","0") == "1",
+                "mangohud":              f.get("WORKAROUND_MANGOHUD",         "0") == "1",
+                "enable_gamescope_wsi":  f.get("WORKAROUND_ENABLE_GAMESCOPE_WSI", "0") == "1",
+                "enable_zink":           f.get("WORKAROUND_ENABLE_ZINK",      "0") == "1",
             }
         except Exception as e:
-            return {"success": False, "mesa_immediate": False, "disable_vkbasalt": False, "error": str(e)}
+            return {"success": False, "error": str(e),
+                    "mesa_immediate": False, "disable_vkbasalt": False,
+                    "force_enable_vkbasalt": False, "dxvk_frame_rate": 0,
+                    "enable_wow64": False, "disable_steamdeck": False,
+                    "mangohud": False, "enable_gamescope_wsi": False,
+                    "enable_zink": False}
 
-    async def set_workaround(self, key: str, enabled: bool) -> Dict[str, Any]:
-        """Toggle a single workaround flag. key: 'mesa_immediate' | 'disable_vkbasalt'."""
+    async def set_workaround(self, key: str, value: str) -> Dict[str, Any]:
+        """
+        Set a single workaround. value is always a string:
+          booleans: '0' or '1'
+          integers: '0', '30', '60' …
+        """
         KEY_MAP = {
-            "mesa_immediate": "WORKAROUND_MESA_IMMEDIATE",
-            "disable_vkbasalt": "WORKAROUND_DISABLE_VKBASALT",
+            "mesa_immediate":        "WORKAROUND_MESA_IMMEDIATE",
+            "disable_vkbasalt":      "WORKAROUND_DISABLE_VKBASALT",
+            "force_enable_vkbasalt": "WORKAROUND_FORCE_ENABLE_VKBASALT",
+            "dxvk_frame_rate":       "WORKAROUND_DXVK_FRAME_RATE",
+            "enable_wow64":          "WORKAROUND_ENABLE_WOW64",
+            "disable_steamdeck":     "WORKAROUND_DISABLE_STEAMDECK",
+            "mangohud":              "WORKAROUND_MANGOHUD",
+            "enable_gamescope_wsi":  "WORKAROUND_ENABLE_GAMESCOPE_WSI",
+            "enable_zink":           "WORKAROUND_ENABLE_ZINK",
         }
         if key not in KEY_MAP:
             return {"success": False, "error": f"Unknown workaround key: {key}"}
         try:
-            self._set_env_flag(KEY_MAP[key], "1" if enabled else "0")
-            return {"success": True, "key": key, "enabled": enabled}
+            # Enforce mutex: disable_vkbasalt ↔ force_enable_vkbasalt
+            flags = self._read_env()
+            flags[KEY_MAP[key]] = str(value)
+            if key == "disable_vkbasalt" and str(value) == "1":
+                flags["WORKAROUND_FORCE_ENABLE_VKBASALT"] = "0"
+            elif key == "force_enable_vkbasalt" and str(value) == "1":
+                flags["WORKAROUND_DISABLE_VKBASALT"] = "0"
+            self._write_env(flags)
+            return {"success": True, "key": key, "value": value}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -186,6 +240,26 @@ class Plugin:
             return {"success": True, "log": tail, "message": None}
         except Exception as e:
             return {"success": False, "log": "", "error": str(e)}
+
+    async def get_config_file_content(self) -> Dict[str, Any]:
+        """Return the raw content of omfg-live.toml."""
+        try:
+            p = self.configuration_service.config_file
+            if not p.exists():
+                return {"success": True, "content": "", "message": "Config file not found"}
+            return {"success": True, "content": p.read_text(errors="replace"), "message": None}
+        except Exception as e:
+            return {"success": False, "content": "", "error": str(e)}
+
+    async def get_wrapper_script_content(self) -> Dict[str, Any]:
+        """Return the raw content of omfg-wrapper.sh."""
+        try:
+            p = self.installation_service.config_dir / WRAPPER_FILENAME
+            if not p.exists():
+                return {"success": True, "content": "", "message": "Wrapper script not found"}
+            return {"success": True, "content": p.read_text(errors="replace"), "message": None}
+        except Exception as e:
+            return {"success": False, "content": "", "error": str(e)}
 
     # ------------------------------------------------------------------
     # Self-updater

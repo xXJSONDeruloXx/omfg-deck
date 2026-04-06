@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { PanelSectionRow, ToggleField, SliderField, DropdownItem, ButtonItem, TextField } from "@decky/ui";
+import { RiArrowDownSFill, RiArrowUpSFill } from "react-icons/ri";
 import {
   OmfgConfig,
   ALL_LAYER_MODES,
@@ -38,7 +40,18 @@ interface Props {
   onReset: () => Promise<unknown>;
 }
 
+const CONFIG_STORAGE_KEY = "omfg-config-collapsed";
+
 export function ConfigurationSection({ config, onFieldChange, onReset }: Props) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CONFIG_STORAGE_KEY) ?? "false"); }
+    catch { return false; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(collapsed)); } catch {}
+  }, [collapsed]);
+
   const mode = config.OMFG_LAYER_MODE;
   const showMulti      = isMultiMode(mode);
   const showAdaptive   = isAdaptiveMode(mode);
@@ -52,6 +65,26 @@ export function ConfigurationSection({ config, onFieldChange, onReset }: Props) 
 
   return (
     <>
+      {/* ── Config header + collapse ────────────────── */}
+      <PanelSectionRow>
+        <div style={{
+          fontSize: "14px", fontWeight: "bold", marginTop: "8px", marginBottom: "6px",
+          borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "3px", color: "white",
+        }}>
+          Config
+        </div>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <ButtonItem layout="below" bottomSeparator={collapsed ? "standard" : "none"}
+          onClick={() => setCollapsed((c: boolean) => !c)}>
+          {collapsed
+            ? <RiArrowDownSFill style={{ transform: "translate(0,-13px)", fontSize: "1.5em" }} />
+            : <RiArrowUpSFill  style={{ transform: "translate(0,-12px)", fontSize: "1.5em" }} />}
+        </ButtonItem>
+      </PanelSectionRow>
+
+      {!collapsed && (
+        <>
       {/* ── Mode ────────────────────────────────────── */}
       <SectionHeader title="Mode" />
       <PanelSectionRow>
@@ -274,6 +307,8 @@ export function ConfigurationSection({ config, onFieldChange, onReset }: Props) 
           Reset to Defaults
         </ButtonItem>
       </PanelSectionRow>
+        </>
+      )}
     </>
   );
 }
