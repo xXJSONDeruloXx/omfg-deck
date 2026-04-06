@@ -50,6 +50,20 @@ export interface LayerLogResult {
   error?: string;
 }
 
+export interface WorkaroundsResult {
+  success: boolean;
+  mesa_immediate: boolean;
+  disable_vkbasalt: boolean;
+  error?: string;
+}
+
+export interface SetWorkaroundResult {
+  success: boolean;
+  key?: string;
+  enabled?: boolean;
+  error?: string;
+}
+
 export interface UpdateCheckResult {
   success: boolean;
   update_available: boolean;
@@ -83,6 +97,9 @@ export const getLaunchOption  = callable<[], LaunchOptionResult>("get_launch_opt
 export const getLayerEnabled  = callable<[], LayerEnabledResult>("get_layer_enabled");
 export const setLayerEnabled  = callable<[enabled: boolean], LayerEnabledResult>("set_layer_enabled");
 export const getLayerLog      = callable<[lines: number], LayerLogResult>("get_layer_log");
+
+export const getWorkarounds   = callable<[], WorkaroundsResult>("get_workarounds");
+export const setWorkaround    = callable<[key: string, enabled: boolean], SetWorkaroundResult>("set_workaround");
 
 export const checkForPluginUpdate  = callable<[], UpdateCheckResult>("check_for_plugin_update");
 export const downloadPluginUpdate  = callable<[download_url: string], UpdateDownloadResult>("download_plugin_update");

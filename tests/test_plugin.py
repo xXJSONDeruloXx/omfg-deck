@@ -412,3 +412,87 @@ class TestLayerEnabledEdgeCases:
             result = run(plugin.get_layer_log(10))
         assert result["success"] is False
         assert result["error"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Workaround methods
+# ---------------------------------------------------------------------------
+
+class TestWorkarounds:
+    def test_defaults_off(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_workarounds())
+        assert result["success"] is True
+        assert result["mesa_immediate"] is False
+        assert result["disable_vkbasalt"] is False
+
+    def test_set_mesa_immediate_on(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("mesa_immediate", True))
+        result = run(plugin.get_workarounds())
+        assert result["mesa_immediate"] is True
+        assert result["disable_vkbasalt"] is False   # other unchanged
+
+    def test_set_disable_vkbasalt_on(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("disable_vkbasalt", True))
+        result = run(plugin.get_workarounds())
+        assert result["disable_vkbasalt"] is True
+
+    def test_disable_layer_persists_after_workaround_write(self, patched_home, mock_decky):
+        """Setting a workaround must not clobber the layer-enabled flag."""
+        plugin = make_plugin(patched_home)
+        run(plugin.set_layer_enabled(False))
+        run(plugin.set_workaround("mesa_immediate", True))
+        assert run(plugin.get_layer_enabled())["enabled"] is False
+        assert run(plugin.get_workarounds())["mesa_immediate"] is True
+
+    def test_invalid_key_returns_error(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.set_workaround("nonexistent_key", True))
+        assert result["success"] is False
+
+    def test_get_launch_option_includes_mesa_when_enabled(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("mesa_immediate", True))
+        result = run(plugin.get_launch_option())
+        assert "MESA_VK_WSI_PRESENT_MODE=immediate" in result["launch_option"]
+
+    def test_get_launch_option_includes_vkbasalt_when_enabled(self, patched_home):
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("disable_vkbasalt", True))
+        result = run(plugin.get_launch_option())
+        assert "DISABLE_VKBASALT=1" in result["launch_option"]
+
+    def test_get_launch_option_no_workarounds_by_default(self, patched_home):
+        plugin = make_plugin(patched_home)
+        result = run(plugin.get_launch_option())
+        assert "MESA" not in result["launch_option"]
+        assert "VKBASALT" not in result["launch_option"]
+        assert "ENABLE_OMFG_RUST=1" in result["launch_option"]
+
+    def test_get_launch_option_ordering(self, patched_home):
+        """Workarounds should appear before ENABLE_OMFG_RUST."""
+        plugin = make_plugin(patched_home)
+        run(plugin.set_workaround("mesa_immediate", True))
+        run(plugin.set_workaround("disable_vkbasalt", True))
+        opt = run(plugin.get_launch_option())["launch_option"]
+        mesa_pos = opt.index("MESA")
+        omfg_pos = opt.index("ENABLE_OMFG_RUST")
+        assert mesa_pos < omfg_pos
+
+
+class TestWorkaroundsExceptions:
+    def test_get_workarounds_exception_returns_error(self, patched_home, monkeypatch):
+        plugin = make_plugin(patched_home)
+        with patch.object(plugin, "_read_env", side_effect=RuntimeError("io error")):
+            result = run(plugin.get_workarounds())
+        assert result["success"] is False
+        assert result["mesa_immediate"] is False
+
+    def test_set_workaround_write_failure_returns_error(self, patched_home, monkeypatch):
+        plugin = make_plugin(patched_home)
+        with patch.object(plugin, "_set_env_flag", side_effect=OSError("disk full")):
+            result = run(plugin.set_workaround("mesa_immediate", True))
+        assert result["success"] is False
+        assert result["error"] is not None

@@ -66,14 +66,61 @@ class Plugin:
         return self.configuration_service.reset_config()
 
     async def get_launch_option(self) -> Dict[str, Any]:
-        """Return the Steam launch option string for per-game activation."""
+        """Return the Steam launch option string, including active workarounds."""
         config_path = str(self.configuration_service.config_file)
-        launch_opt = (
-            f"{LAYER_ENABLE_ENV}=1 "
-            f"{HOT_CONFIG_ENV}={config_path} "
-            "%command%"
-        )
+        flags = self._read_env()
+
+        # Build prefix from active workarounds
+        prefix_parts = []
+        if flags.get("WORKAROUND_MESA_IMMEDIATE", "0") == "1":
+            prefix_parts.append("MESA_VK_WSI_PRESENT_MODE=immediate")
+        if flags.get("WORKAROUND_DISABLE_VKBASALT", "0") == "1":
+            prefix_parts.append("DISABLE_VKBASALT=1")
+
+        prefix_parts += [
+            f"{LAYER_ENABLE_ENV}=1",
+            f"{HOT_CONFIG_ENV}={config_path}",
+        ]
+        launch_opt = " ".join(prefix_parts) + " %command%"
         return {"success": True, "launch_option": launch_opt}
+
+    # ------------------------------------------------------------------
+    # omfg.env: shared key/value store for plugin-managed flags
+    # ------------------------------------------------------------------
+
+    def _env_path(self) -> Path:
+        return self.configuration_service.config_dir / ENV_FILENAME
+
+    def _read_env(self) -> Dict[str, str]:
+        """Read all key=value pairs from omfg.env (ignores comments)."""
+        flags: Dict[str, str] = {}
+        p = self._env_path()
+        if not p.exists():
+            return flags
+        for raw in p.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            flags[key.strip()] = val.strip()
+        return flags
+
+    def _write_env(self, flags: Dict[str, str]) -> None:
+        """Write key=value pairs to omfg.env atomically."""
+        config_dir = self.configuration_service.config_dir
+        config_dir.mkdir(parents=True, exist_ok=True)
+        lines = ["# omfg-deck managed flags — do not edit by hand"]
+        for key, val in sorted(flags.items()):
+            lines.append(f"{key}={val}")
+        lines.append("")
+        self.configuration_service._atomic_write(
+            self._env_path(), "\n".join(lines), 0o644
+        )
+
+    def _set_env_flag(self, key: str, value: str) -> None:
+        flags = self._read_env()
+        flags[key] = value
+        self._write_env(flags)
 
     # ------------------------------------------------------------------
     # Layer enable / log
@@ -82,36 +129,51 @@ class Plugin:
     async def get_layer_enabled(self) -> Dict[str, Any]:
         """Read the global layer-enabled flag from omfg.env."""
         try:
-            env_file = self.configuration_service.config_dir / ENV_FILENAME
-            if not env_file.exists():
-                return {"success": True, "enabled": True}
-            for line in env_file.read_text().splitlines():
-                line = line.strip()
-                if line.startswith("OMFG_DISABLE_LAYER="):
-                    val = line.split("=", 1)[1].strip()
-                    return {"success": True, "enabled": val != "1"}
-            return {"success": True, "enabled": True}
+            flags = self._read_env()
+            enabled = flags.get("OMFG_DISABLE_LAYER", "0") != "1"
+            return {"success": True, "enabled": enabled}
         except Exception as e:
             return {"success": False, "enabled": True, "error": str(e)}
 
     async def set_layer_enabled(self, enabled: bool) -> Dict[str, Any]:
         """Write OMFG_DISABLE_LAYER to omfg.env to globally enable/disable."""
         try:
-            env_file = self.configuration_service.config_dir
-            config_dir = self.configuration_service.config_dir
-            config_dir.mkdir(parents=True, exist_ok=True)
-            env_path = config_dir / ENV_FILENAME
-            disable_val = "0" if enabled else "1"
-            content = (
-                "# omfg-deck: global layer enable flag\n"
-                f"OMFG_DISABLE_LAYER={disable_val}\n"
-            )
-            self.configuration_service._atomic_write(env_path, content, 0o644)
+            self._set_env_flag("OMFG_DISABLE_LAYER", "0" if enabled else "1")
             import decky
             decky.logger.info(f"Layer globally {'enabled' if enabled else 'disabled'}")
             return {"success": True, "enabled": enabled}
         except Exception as e:
             return {"success": False, "enabled": True, "error": str(e)}
+
+    # ------------------------------------------------------------------
+    # Workarounds
+    # ------------------------------------------------------------------
+
+    async def get_workarounds(self) -> Dict[str, Any]:
+        """Return the current state of all workaround flags."""
+        try:
+            flags = self._read_env()
+            return {
+                "success": True,
+                "mesa_immediate": flags.get("WORKAROUND_MESA_IMMEDIATE", "0") == "1",
+                "disable_vkbasalt": flags.get("WORKAROUND_DISABLE_VKBASALT", "0") == "1",
+            }
+        except Exception as e:
+            return {"success": False, "mesa_immediate": False, "disable_vkbasalt": False, "error": str(e)}
+
+    async def set_workaround(self, key: str, enabled: bool) -> Dict[str, Any]:
+        """Toggle a single workaround flag. key: 'mesa_immediate' | 'disable_vkbasalt'."""
+        KEY_MAP = {
+            "mesa_immediate": "WORKAROUND_MESA_IMMEDIATE",
+            "disable_vkbasalt": "WORKAROUND_DISABLE_VKBASALT",
+        }
+        if key not in KEY_MAP:
+            return {"success": False, "error": f"Unknown workaround key: {key}"}
+        try:
+            self._set_env_flag(KEY_MAP[key], "1" if enabled else "0")
+            return {"success": True, "key": key, "enabled": enabled}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def get_layer_log(self, lines: int = 50) -> Dict[str, Any]:
         """Return the last N lines of the OMFG layer log file."""

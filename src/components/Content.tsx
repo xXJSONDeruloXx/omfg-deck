@@ -2,14 +2,17 @@ import { useEffect } from "react";
 import { PanelSection, PanelSectionRow, ToggleField } from "@decky/ui";
 import { useInstallationStatus, useOmfgConfig, useLayerEnabled } from "../hooks/useOmfgHooks";
 import { useInstallationActions } from "../hooks/useInstallationActions";
+import { useWorkarounds } from "../hooks/useWorkarounds";
 import { StatusDisplay } from "./StatusDisplay";
 import { InstallationButton } from "./InstallationButton";
 import { ConfigurationSection } from "./ConfigurationSection";
+import { WorkaroundsSection } from "./WorkaroundsSection";
 import { UsageInstructions } from "./UsageInstructions";
 import { PluginUpdateChecker } from "./PluginUpdateChecker";
 import { GitHubButton } from "./GitHubButton";
 import { LogViewer } from "./LogViewer";
 import { OmfgConfig } from "../config/configSchema";
+import { WorkaroundState } from "../hooks/useWorkarounds";
 
 export function Content() {
   const {
@@ -24,6 +27,7 @@ export function Content() {
 
   const { config, loadConfig, updateField, resetConfig } = useOmfgConfig();
   const { layerEnabled, toggleEnabled } = useLayerEnabled();
+  const { workarounds, toggle: toggleWorkaround } = useWorkarounds();
   const { isInstalling, isUninstalling, handleInstall, handleUninstall } = useInstallationActions();
 
   useEffect(() => {
@@ -40,6 +44,10 @@ export function Content() {
 
   const handleFieldChange = async (key: keyof OmfgConfig, value: OmfgConfig[keyof OmfgConfig]) => {
     await updateField(key, value);
+  };
+
+  const handleWorkaroundToggle = async (key: keyof WorkaroundState, enabled: boolean) => {
+    await toggleWorkaround(key, enabled);
   };
 
   return (
@@ -80,6 +88,11 @@ export function Content() {
           onReset={resetConfig}
         />
       )}
+
+      <WorkaroundsSection
+        workarounds={workarounds}
+        onToggle={handleWorkaroundToggle}
+      />
 
       <UsageInstructions config={config} />
 

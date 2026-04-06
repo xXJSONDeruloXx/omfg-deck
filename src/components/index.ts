@@ -2,6 +2,7 @@ export { Content } from "./Content";
 export { StatusDisplay } from "./StatusDisplay";
 export { InstallationButton } from "./InstallationButton";
 export { ConfigurationSection } from "./ConfigurationSection";
+export { WorkaroundsSection } from "./WorkaroundsSection";
 export { UsageInstructions } from "./UsageInstructions";
 export { PluginUpdateChecker } from "./PluginUpdateChecker";
 export { GitHubButton } from "./GitHubButton";
