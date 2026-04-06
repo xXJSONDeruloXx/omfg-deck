@@ -9,6 +9,7 @@ export default definePlugin(() => {
   return {
     name: "OMFG",
     titleView: <div className={staticClasses.Title}>OMFG</div>,
+    alwaysRender: true,
     content: <Content />,
     icon: <FaLayerGroup />,
     onDismount() {
